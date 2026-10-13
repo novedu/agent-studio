@@ -1,5 +1,15 @@
 # Agent Studio
 
+[![CI](https://github.com/novedu/agent-studio/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/novedu/agent-studio/actions/workflows/ci.yml)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
+
+> **中文简介** — AI Agent Runtime 控制台：把 Agent 的规划、工具调用、检索、反思与评测过程，变成可观测、可解释的事件流。
+>
+> **技术栈** TypeScript · React · Node.js · Zustand · SSE · npm workspaces
+>
+> **实现说明（如实披露）** 见下方 [Implementation Notes](#implementation-notes实现说明) —— 含真实 LLM 接入方式、Mock 回退逻辑与 RAG 当前实现。
+
 AI Agent Runtime Studio for planning, execution, observation, memory, retrieval, reflection, and evaluation.
 
 This is a portfolio project for AI Agent Platform / AI Agent full-stack interviews. It is not a ChatGPT clone, not a dashboard template, and not a fake SaaS shell. The core goal is to make an interviewer believe the candidate understands how an Agent Runtime is built, streamed, inspected, and explained.
@@ -8,7 +18,7 @@ This is a portfolio project for AI Agent Platform / AI Agent full-stack intervie
 
 ## Project Introduction
 
-Agent Studio turns a running AI agent into an IDE-like runtime console.
+Agent Studio turns a running AI agent into a runtime console: four synchronized views (Chat / Graph / Timeline / Inspector) projected from a single runtime state model.
 
 The main demo starts with:
 
@@ -306,6 +316,97 @@ npm run build
 Note: in restricted sandbox environments, `tsx` and Vite may fail with local IPC or port-listening errors such as `listen EPERM ... tsx-501/*.pipe`. Run the same commands in a normal local terminal for final verification.
 
 The test suite covers RuntimeObject projection, SSE event projection, Knowledge and Memory derived views, Timeline modeling, Inspector rendering, and the Runtime Server health endpoint.
+
+## Implementation Notes（实现说明）
+
+如实说明各能力的**当前实现方式**，避免与已完成的生产能力混淆。
+
+### 1 · Real LLM Provider
+
+LLM 层是可替换的抽象（`packages/agent-runtime/src/llm/provider.ts`）：
+
+```ts
+export interface LLMProvider {
+  name: string
+  chat(messages: ChatMessage[], tools?: ToolDefinition[]): Promise<LLMResponse>
+}
+```
+
+`OpenAIProvider`（`llm/openai-provider.ts`，143 行）实现**真实模型调用**：
+
+- 真实 `fetch` 请求 `${baseURL}/chat/completions`，携带 `Authorization: Bearer ${apiKey}`
+- 默认 `baseURL = https://api.openai.com/v1`，`model = gpt-4.1-mini`
+- 解析 `choices[0].message` 与 `tool_calls`（含 `function.name` / `function.arguments`）
+- 对 HTTP 错误、空响应、tool call 字段缺失、参数解析失败做**错误归一化**
+
+由于走的是 OpenAI **兼容协议**，修改 `baseURL` 即可对接 DeepSeek / Qwen 等网关。
+
+启用方式：
+
+```bash
+OPENAI_API_KEY=sk-xxx
+OPENAI_BASE_URL=https://api.openai.com/v1   # 可替换为任意兼容网关
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+### 2 · Mock Provider
+
+`MockLLMProvider`（`llm/mock-llm-provider.ts`，99 行）用于**离线演示与本地开发**：
+
+- 构造时注入一组预设响应队列，`chat()` 按 `index` 顺序返回
+- 默认 `delayMs = 200`，模拟真实流式节奏
+- 队列耗尽返回 `{ content: 'No more responses.', done: true }` —— **不会伪装成模型输出**
+- 选择逻辑（`agent/main.ts`、`apps/runtime-server/src/runtime/agent-runtime-adapter.ts`）：
+
+```ts
+const realLLMProvider = process.env.OPENAI_API_KEY
+  ? new OpenAIProvider({ apiKey, baseURL, model })
+  : undefined
+const llmProvider = realLLMProvider ?? mockLLMProvider
+```
+
+即：**无 API Key 时整条 Agent 链路依然可以跑通**，便于演示、CI 与本地开发。
+
+### 3 · RAG 当前实现
+
+**当前是关键词检索，不是向量检索。**
+
+`Retriever.retrieve(query, topK = 3)`（`rag/retriever.ts`）的实际逻辑：
+
+1. `tokenize()`：小写化 → 按中英文标点切分 → 中文额外做**二字滑窗（bigram）**切分
+2. 打分：`score = matchedKeywords.length`（**命中关键词计数**）
+3. 过滤 `score > 0` → 按 score 降序 → 取 `topK`
+
+**本项目内没有 Embedding 模型、没有向量数据库、没有余弦相似度。**
+知识库内容为 `createDefaultKnowledgeBase()` 注入的**内置示例文档**（`KnowledgeBase` 是内存中的文档数组）。
+
+项目 Settings 页面原文：
+
+> *"Document ingestion and vector index management are future work."*
+
+向量检索与文档上传管线是明确的**下一步计划**，不是正在实现中的能力。
+
+### 4 · Runtime 架构
+
+monorepo 结构：`apps/`（agent-console、runtime-server）+ `packages/`（agent-runtime、shared-types、shared-utils）。
+
+`agent-runtime` 的实际模块与导出：
+
+| 模块 | 导出 |
+|---|---|
+| `agent/` | Agent、ConversationManager、EventEmitter |
+| `planner/` | Planner、PlanValidator |
+| `workflow/` | WorkflowRunner、AgentState |
+| `tool/` | ToolRegistry、ToolExecutor（`ToolTimeoutError` / `ToolArgumentError` / `ToolNotFoundError`） |
+| `rag/` | Retriever、KnowledgeBase、ContextBuilder |
+| `memory/` | MemoryManager / MemoryUpdater / MemoryRetriever；Working / Episodic / Semantic 三层记忆 |
+| `observability/` | TraceManager、Span、AgentMetrics |
+| `evaluation/` | RuleBasedEvaluator |
+
+`runtime-server` 负责任务生命周期（`task-manager` / `task-store` / `task-repository`）
+与 SSE 事件流（`sse/event-stream.ts`），共 **15 类**运行时事件。
+
+---
 
 ## What Is Real Today
 

@@ -8,7 +8,7 @@
 >
 > **技术栈** TypeScript · React · Node.js · Zustand · SSE · npm workspaces
 >
-> **实现说明（如实披露）** 见下方 [Implementation Notes](#implementation-notes实现说明) —— 含真实 LLM 接入方式、Mock 回退逻辑与 RAG 当前实现。
+> LLM 层支持接入 OpenAI 兼容模型（未配置时 Mock 回退）；RAG 为关键词检索。详见 [Implementation Notes](#implementation-notes)。
 
 AI Agent Runtime Studio for planning, execution, observation, memory, retrieval, reflection, and evaluation.
 
@@ -317,9 +317,9 @@ Note: in restricted sandbox environments, `tsx` and Vite may fail with local IPC
 
 The test suite covers RuntimeObject projection, SSE event projection, Knowledge and Memory derived views, Timeline modeling, Inspector rendering, and the Runtime Server health endpoint.
 
-## Implementation Notes（实现说明）
+## Implementation Notes
 
-如实说明各能力的**当前实现方式**，避免与已完成的生产能力混淆。
+本节说明各能力的实现方式与当前范围。
 
 ### 1 · Real LLM Provider
 
@@ -355,7 +355,7 @@ OPENAI_MODEL=gpt-4.1-mini
 
 - 构造时注入一组预设响应队列，`chat()` 按 `index` 顺序返回
 - 默认 `delayMs = 200`，模拟真实流式节奏
-- 队列耗尽返回 `{ content: 'No more responses.', done: true }` —— **不会伪装成模型输出**
+- 队列耗尽返回 `{ content: 'No more responses.', done: true }`
 - 选择逻辑（`agent/main.ts`、`apps/runtime-server/src/runtime/agent-runtime-adapter.ts`）：
 
 ```ts

@@ -18,6 +18,7 @@ import {
   type Evaluator,
   type LLMProvider,
 } from '@runtime/index';
+import { getLLMProviderName, resolveLLMConfig } from '../env';
 import { defaultUserContext, type ToolSecurityEventType, type UserContext } from '@shared-types/security';
 import type { EvaluationContext, TraceRecord } from '@shared-types/trace';
 import type { AgentEvent, AgentTrace, LLMResponse, Plan, ToolResult } from '@shared-types/agent';
@@ -482,16 +483,16 @@ function createKnowledgeBase(): KnowledgeBase {
 }
 
 export function hasRealLLMProvider(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY);
+  return getLLMProviderName() !== 'mock';
 }
 
 function createDefaultLLMProvider(): LLMProvider {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (apiKey) {
+  const config = resolveLLMConfig();
+  if (config.provider !== 'mock' && config.apiKey) {
     return new OpenAIProvider({
-      apiKey,
-      baseURL: process.env.OPENAI_BASE_URL,
-      model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+      apiKey: config.apiKey,
+      baseURL: config.baseURL,
+      model: config.model ?? (config.provider === 'deepseek' ? 'deepseek-chat' : 'gpt-4.1-mini'),
     });
   }
 

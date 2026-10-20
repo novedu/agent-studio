@@ -2,6 +2,14 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Real model provider and secret scanning
+
+- The server resolves the LLM provider from the environment: `DEEPSEEK_API_KEY` (default base `https://api.deepseek.com/v1`, model `deepseek-chat`), then `OPENAI_API_KEY`, then the offline mock.
+- `.env` is loaded at startup when present; values already exported in the shell win. `/health` now reports the active provider name, which is what drives the `MOCK` badge.
+- Added `.env.example` with empty placeholders for DeepSeek, OpenAI and the console.
+- Added `scripts/check-secrets.mjs` and wired it into `npm test`: the build fails when a key-shaped value reaches a git-tracked file.
+- Documented the setup and the "revoke first, rewrite history second" rule in the README.
+
 ## Unreleased - Interrupted answers and per-message retry
 
 - When the SSE stream drops mid-answer the streaming message is flagged `interrupted`, keeps whatever text already arrived, and shows a "连接中断，这条回答没有完成" bar with a "重试这条" action that repeats that user turn.

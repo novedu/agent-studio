@@ -226,6 +226,33 @@ docs/
 └── media/
 ```
 
+## 接入真实模型（DeepSeek / OpenAI）
+
+默认是无 key 的 Mock 模式（输入框下方会显示 `MOCK` 徽标，回答由本地模板生成）。接真实模型三步：
+
+```bash
+cp .env.example .env      # .env 已被 git-ignore
+# 编辑 .env，填入 DEEPSEEK_API_KEY=...
+npm run server
+```
+
+服务端按顺序解析：
+
+| 优先级 | 变量 | 默认值 |
+| --- | --- | --- |
+| 1 | `DEEPSEEK_API_KEY` | baseURL `https://api.deepseek.com/v1`，model `deepseek-chat` |
+| 2 | `OPENAI_API_KEY` | baseURL `https://api.openai.com/v1`，model `gpt-4.1-mini` |
+| 3 | 都没有 | Mock 模式 |
+
+`GET /health` 返回当前实际 provider（`deepseek` / `openai` / `mock`），控制台的 `MOCK` 徽标就依据它显示。
+
+### 密钥安全
+
+- `.env`、`.env.*` 都在 `.gitignore` 里，仓库里只有空占位的 `.env.example`。
+- `npm test` 的第一步是 `node scripts/check-secrets.mjs`：扫描所有 git 跟踪的文件，命中 `sk-` 形状或非空的 `*_API_KEY=` 直接失败退出。
+- 单独检查：`npm run check:secrets`。
+- 万一提交过：**先去平台吊销这个 key**，再清理历史（`git filter-repo`）。只删文件不够，历史里还在。
+
 ## Quick Start
 
 > 未配置 `OPENAI_API_KEY` 时服务端运行在 **Mock 模式**：界面底部会显示 `Mock` 标记，回答来自本地模板而不是模型调用。想看完整脚本化链路，请提问「分析华东区域销售下降原因，并生成报告」。

@@ -23,7 +23,8 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && npm --prefix apps/agent-console run build",
     "lint": "npm --prefix apps/agent-console run lint",
-    "test": "tsx packages/agent-runtime/src/agent/conversation-context-test.ts && tsx packages/agent-runtime/src/llm/mock-llm-provider-test.ts && tsx packages/agent-runtime/src/tool/security/reliability-test.ts && tsx apps/runtime-server/src/health-test.ts && npm --prefix apps/agent-console run test"
+    "test": "node scripts/check-secrets.mjs && tsx packages/agent-runtime/src/agent/conversation-context-test.ts && tsx packages/agent-runtime/src/llm/mock-llm-provider-test.ts && tsx packages/agent-runtime/src/tool/security/reliability-test.ts && tsx apps/runtime-server/src/health-test.ts && npm --prefix apps/agent-console run test",
+    "check:secrets": "node scripts/check-secrets.mjs"
   },
   "author": "novedu",
   "license": "MIT",

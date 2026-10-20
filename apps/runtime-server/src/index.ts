@@ -1,4 +1,5 @@
 import { createAgentServerApp, type CreateAgentServerAppOptions } from './app';
+import { loadEnvFile } from './env';
 import { createHttpServer } from './http';
 import { AgentRuntimeAdapter } from './runtime/agent-runtime-adapter';
 
@@ -7,6 +8,7 @@ export function createServer(options: CreateAgentServerAppOptions) {
 }
 
 export function startServer(port = Number(process.env.PORT ?? 3001)) {
+  loadEnvFile();
   const app = createAgentServerApp({
     runtime: new AgentRuntimeAdapter(),
   });

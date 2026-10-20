@@ -523,8 +523,10 @@ function EmptyInspector({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto">
       <section className="border-b border-line bg-white p-3">
-        <div className="grid grid-cols-3 gap-2">
-          <OverviewStat label="Step" value={truncate(runtimeOverview.currentStep, 14)} />
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+          <div className="col-span-2 min-w-0">
+            <OverviewStat label="Step" value={truncate(runtimeOverview.currentStep, 22)} />
+          </div>
           <OverviewStat label="Progress" value={`${runtimeOverview.progress}%`} />
           <OverviewStat label="Eval" value={evaluationLabel} />
         </div>

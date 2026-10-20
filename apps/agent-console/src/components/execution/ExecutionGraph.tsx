@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
 import type { PointerEvent } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FitViewIcon, Panel, ZoomInIcon, ZoomOutIcon } from '../ui';
 import { ExecutionNode } from './ExecutionNode';
+import { computeFitScale, GRAPH_MAX_SCALE, GRAPH_MIN_SCALE } from './graph-fit';
 import {
   getStatusColor,
   type ExecutionNodeRecord,
@@ -42,9 +43,9 @@ export function ExecutionGraph({
 }: ExecutionGraphProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.92);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const dragStart = useRef<{ pointerX: number; pointerY: number; x: number; y: number }>();
+  const [scale, setScale] = useState(1);
+  const dragStart = useRef<{ pointerX: number; pointerY: number; left: number; top: number }>();
+  const interactedRef = useRef(false);
 
   const objects = useMemo(
     () => runtimeObjects ?? buildRuntimeObjects(nodes),
@@ -61,28 +62,50 @@ export function ExecutionGraph({
     activeRef.current.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
   }, [activeNodeId]);
 
-  function fitView() {
-    setScale(0.86);
-    setOffset({ x: 0, y: 0 });
-    viewportRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-  }
+  const fitView = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    setScale(computeFitScale(graph.width, graph.height, el.clientWidth, el.clientHeight));
+    if (typeof el.scrollTo === 'function') {
+      el.scrollTo({ top: 0, left: 0 });
+    } else {
+      el.scrollLeft = 0;
+      el.scrollTop = 0;
+    }
+  }, [graph.width, graph.height]);
+
+  // Re-fit whenever the layout grows, so a finished run is always fully visible.
+  // Once the user pans or zooms we stop moving the viewport under them.
+  useEffect(() => {
+    if (interactedRef.current) return;
+    fitView();
+  }, [fitView]);
+
+  const zoomBy = useCallback((delta: number) => {
+    interactedRef.current = true;
+    setScale((value) =>
+      Math.min(GRAPH_MAX_SCALE, Math.max(GRAPH_MIN_SCALE, Number((value + delta).toFixed(2)))),
+    );
+  }, []);
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    const el = viewportRef.current;
+    if (!el) return;
     event.currentTarget.setPointerCapture(event.pointerId);
+    interactedRef.current = true;
     dragStart.current = {
       pointerX: event.clientX,
       pointerY: event.clientY,
-      x: offset.x,
-      y: offset.y,
+      left: el.scrollLeft,
+      top: el.scrollTop,
     };
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (!dragStart.current) return;
-    setOffset({
-      x: dragStart.current.x + event.clientX - dragStart.current.pointerX,
-      y: dragStart.current.y + event.clientY - dragStart.current.pointerY,
-    });
+    const el = viewportRef.current;
+    if (!el || !dragStart.current) return;
+    el.scrollLeft = dragStart.current.left - (event.clientX - dragStart.current.pointerX);
+    el.scrollTop = dragStart.current.top - (event.clientY - dragStart.current.pointerY);
   }
 
   function handlePointerUp() {
@@ -98,7 +121,7 @@ export function ExecutionGraph({
           <button
             type="button"
             aria-label="Zoom out"
-            onClick={() => setScale((value) => Math.max(0.68, value - 0.12))}
+            onClick={() => zoomBy(-0.12)}
             className="flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-line bg-white text-muted transition-colors duration-200 hover:bg-panel"
           >
             <ZoomOutIcon className="h-2.5 w-2.5" />
@@ -109,14 +132,17 @@ export function ExecutionGraph({
           <button
             type="button"
             aria-label="Zoom in"
-            onClick={() => setScale((value) => Math.min(1.28, value + 0.12))}
+            onClick={() => zoomBy(0.12)}
             className="flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-line bg-white text-muted transition-colors duration-200 hover:bg-panel"
           >
             <ZoomInIcon className="h-2.5 w-2.5" />
           </button>
           <button
             type="button"
-            onClick={fitView}
+            onClick={() => {
+              interactedRef.current = false;
+              fitView();
+            }}
             className="flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-line bg-white text-muted transition-colors duration-200 hover:bg-panel"
           >
             <FitViewIcon className="h-2.5 w-2.5" />
@@ -134,15 +160,12 @@ export function ExecutionGraph({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <motion.div
-          className="relative min-h-full min-w-full origin-top-left"
-          style={{
-            width: graph.width,
-            height: graph.height,
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-          }}
-          transition={{ duration: 0.18 }}
-        >
+        {/* Layout box matches the scaled content so scrollbars are honest. */}
+        <div className="relative" style={{ width: graph.width * scale, height: graph.height * scale }}>
+          <div
+            className="absolute left-0 top-0 origin-top-left"
+            style={{ width: graph.width, height: graph.height, transform: `scale(${scale})` }}
+          >
           <svg
             className="pointer-events-none absolute inset-0 overflow-visible"
             width={graph.width}
@@ -199,7 +222,8 @@ export function ExecutionGraph({
               />
             </motion.div>
           ))}
-        </motion.div>
+          </div>
+        </div>
       </div>
     </Panel>
   );

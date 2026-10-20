@@ -103,7 +103,14 @@ export function EventRateChart({ compact = false }: { compact?: boolean } = {}) 
     if (!chart) return;
     chart.setOption(
       {
-        xAxis: { data: samples.map(sample => formatClock(sample.t)) },
+        xAxis: {
+          data: samples.map(sample => formatClock(sample.t)),
+          axisLabel: { show: samples.length > 1 },
+        },
+        yAxis: {
+          axisLabel: { show: samples.length > 1 },
+          splitLine: { show: samples.length > 1 },
+        },
         series: [{ data: samples.map(sample => sample.count) }],
       },
       { lazyUpdate: true },
@@ -111,6 +118,7 @@ export function EventRateChart({ compact = false }: { compact?: boolean } = {}) 
   }, [samples]);
 
   const peak = samples.reduce((max, sample) => Math.max(max, sample.count), 0);
+  const isEmpty = total === 0;
 
   return (
     <div>
@@ -123,12 +131,19 @@ export function EventRateChart({ compact = false }: { compact?: boolean } = {}) 
           peak {peak} · total {total}
         </span>
       </div>
-      <div
-        ref={containerRef}
-        className={compact ? 'mt-1 h-16 w-full' : 'mt-1 h-24 w-full'}
-        role="img"
-        aria-label={`Runtime event rate over the last ${WINDOW_SECONDS} seconds`}
-      />
+      <div className="relative">
+        <div
+          ref={containerRef}
+          className={compact ? 'mt-1 h-16 w-full' : 'mt-1 h-24 w-full'}
+          role="img"
+          aria-label={`Runtime event rate over the last ${WINDOW_SECONDS} seconds`}
+        />
+        {isEmpty ? (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center text-[10px] text-muted">
+            No events yet — run the demo
+          </div>
+        ) : null}
+      </div>
       {compact ? null : (
         <div className="mt-1 text-[9px] leading-4 text-muted">
           Window {WINDOW_SECONDS}s · capped ring buffer · frame-gated paint

@@ -206,14 +206,17 @@ function RuntimePreview({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="mt-3 flex flex-wrap gap-1.5">
         {runtimeOverview.availableSignals.map((item) => (
-          <div key={item.label} className="rounded-lg border border-line bg-white p-3">
-            <Badge tone={item.tone} className="mb-2">
+          <span
+            key={item.label}
+            className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-line bg-white px-2 py-1 text-[10px] text-muted"
+          >
+            <span className="font-semibold uppercase tracking-[0.08em] text-[9px] text-muted/70">
               {item.label}
-            </Badge>
-            <p className="text-xs leading-5 text-muted">{item.value}</p>
-          </div>
+            </span>
+            <span className="truncate text-ink/80">{item.value}</span>
+          </span>
         ))}
       </div>
 

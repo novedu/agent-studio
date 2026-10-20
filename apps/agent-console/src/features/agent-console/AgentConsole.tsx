@@ -254,7 +254,7 @@ export function AgentConsole() {
           className="grid min-h-0 min-w-0 overflow-hidden transition-[grid-template-rows] duration-200 ease-out"
           style={{
             gridTemplateRows: runtimeDockExpanded
-              ? 'minmax(280px, 1fr) clamp(340px, 44vh, 420px)'
+              ? 'minmax(280px, 1fr) clamp(360px, 50vh, 460px)'
               : 'minmax(280px, 1fr) 72px',
           }}
         >

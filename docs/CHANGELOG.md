@@ -2,6 +2,16 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Density and graph fit pass
+
+- `Runtime Graph` now fits its content for real: scale is derived from the viewport and the graph bounding box (`graph-fit.ts`), instead of the previous hard-coded 86%. The scroll area matches the scaled content, so nodes can no longer be clipped out of reach, and drag-to-pan moves the viewport instead of a CSS offset.
+- Auto-fit stops as soon as the user pans or zooms, so the viewport never fights the user.
+- The runtime dock grew from `clamp(340px, 44vh, 420px)` to `clamp(360px, 50vh, 460px)`.
+- Idle state: five full-size signal cards collapse into one compact chip strip, reclaiming roughly 300px of vertical space.
+- Inspector headline numbers: `Step` gets its own row, so long step names no longer wrap into the number row.
+- Telemetry chart renders a "No events yet" hint instead of a fake 0-1 axis before the first event.
+- Added a render smoke test for `ExecutionGraph` (which also surfaced a missing `Element.scrollTo` fallback for environments without it).
+
 ## Unreleased - Pinned telemetry
 
 - The telemetry chart now sits above the inspector body instead of inside the empty state, so it stays visible after a task starts and an object gets selected.

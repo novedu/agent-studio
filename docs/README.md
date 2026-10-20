@@ -20,4 +20,4 @@ This directory contains the project documentation. The root [README](../README.m
 
 - [RuntimeObject model](architecture/runtime-object.md): frontend projection used by Graph, Timeline, Inspector, Drawer, Chat, and Evidence.
 - [Screenshots](screenshots/README.md): the frames used by the GitHub project page.
-- [Flow overview](media/agent-studio-demo.gif): an animated diagram of the runtime sequence (not a product recording).
+- [Demo recording](media/agent-studio-demo.gif): a real capture of one demo run, from idle to finished task.

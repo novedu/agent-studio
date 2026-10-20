@@ -8,7 +8,9 @@
 
 TypeScript · React · Node.js · Zustand · SSE · npm workspaces ｜ LLM 接入 OpenAI 兼容模型（未配置 Key 时 Mock 回退）｜ RAG 为关键词检索，详见 [Implementation Notes](#implementation-notes)
 
-![Agent Studio runtime console](docs/screenshots/02-agent-running.jpg)
+![Agent Studio runtime demo](docs/media/agent-studio-demo.gif)
+
+*本地 demo 的真实录屏：从 idle 一次 `Run full demo` 跑到 `success`，包含事件速率曲线、依赖图和 Timeline 切换。*
 
 > Agent 执行是黑盒：调了哪个工具、检索到什么、为什么失败，都看不到。
 > 这个项目用 Runtime Event 记录全过程，并投影到 Chat / Graph / Timeline / Inspector 四个同步视图；
@@ -99,7 +101,7 @@ task_complete
 
 ## Demo Screenshots
 
-All screenshots are captured from the local demo task:
+Screenshots are captured from the same local demo task (the recording above is the moving version):
 
 ```text
 分析华东区域销售下降原因，并生成报告
@@ -148,12 +150,6 @@ The selected Final Answer object exposes output, evidence, dependencies, and tra
 Evaluation Center shows score, criteria, feedback, and quality review for the completed sales task.
 
 ![Evaluation](docs/screenshots/07-evaluation.jpg)
-
-### Runtime flow overview
-
-An early animated overview of the Planning -> Tool -> Knowledge -> Memory -> Reflection -> Evaluation -> Answer sequence. It is a diagram animation, not a product recording; the real console is shown in the screenshots above.
-
-![Runtime flow overview](docs/media/agent-studio-demo.gif)
 
 ## Tech Stack
 

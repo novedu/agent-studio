@@ -12,6 +12,7 @@ This directory contains the project documentation. The root [README](../README.m
 | [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) | Design tokens and reusable component rules. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System boundaries, data flow, SSE, and frontend projection. |
 | [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | Recording and walkthrough scripts for the Runtime demo. |
+| [PERFORMANCE.md](PERFORMANCE.md) | Telemetry cost, chart code-splitting, and benchmark reproduction. |
 | [CHANGELOG.md](CHANGELOG.md) | Product and implementation history. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development process, code boundaries, and verification commands. |
 

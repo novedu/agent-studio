@@ -2,6 +2,14 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Runtime telemetry
+
+- Added a live event-rate chart to the Runtime Inspector, fed by the existing SSE event stream.
+- Added `EventRateMeter` (incremental one-second buckets in a capped ring buffer) with unit tests.
+- Added frame-gated painting: one store subscription, at most one paint per animation frame, paused while the tab is hidden.
+- Code-split the chart so the console's first-screen chunk drops from 699 kB to 200 kB (226 kB to 56 kB gzip).
+- Added `scripts/bench-event-rate.ts` and `docs/PERFORMANCE.md` with measured numbers and limitations.
+
 ## Unreleased - Documentation refinement
 
 - Reworked the README opening: Chinese one-liner first, real console screenshot as the hero, capabilities up front.

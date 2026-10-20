@@ -178,6 +178,7 @@ The project documentation is organized by responsibility:
 - [Architecture](docs/ARCHITECTURE.md): frontend, server, runtime, and streaming boundaries.
 - [Demo Scripts](docs/DEMO_SCRIPT.md): 3-minute, 10-minute, and 30-minute walkthroughs.
 - [Contributing](docs/CONTRIBUTING.md): development flow and verification commands.
+- [Performance](docs/PERFORMANCE.md): telemetry cost, bundle split, and how to reproduce.
 - [Changelog](docs/CHANGELOG.md): implementation history.
 
 ## Folder Structure
@@ -319,6 +320,14 @@ npm run build
 Note: in restricted sandbox environments, `tsx` and Vite may fail with local IPC or port-listening errors such as `listen EPERM ... tsx-501/*.pipe`. Run the same commands in a normal local terminal for final verification.
 
 The test suite covers RuntimeObject projection, SSE event projection, Knowledge and Memory derived views, Timeline modeling, Inspector rendering, and the Runtime Server health endpoint.
+
+## Performance
+
+- **Frame-gated telemetry.** Event ingestion is incremental; the chart paints at most once per animation frame and pauses when the tab is hidden.
+- **Bounded memory.** A capped 60-bucket ring buffer keeps per-frame cost flat as the session grows, instead of rescanning the full event array.
+- **Code-split chart.** ECharts ships in its own lazy chunk, so the console's first-screen chunk stays at 200 kB (56 kB gzip) instead of 699 kB (226 kB gzip).
+
+Numbers, method and limitations: [docs/PERFORMANCE.md](docs/PERFORMANCE.md). Reproduce with `npx tsx scripts/bench-event-rate.ts`.
 
 ## Implementation Notes
 

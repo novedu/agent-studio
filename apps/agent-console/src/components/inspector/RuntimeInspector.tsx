@@ -27,7 +27,6 @@ export function RuntimeInspector({
   memory,
   citations,
   evaluation,
-  tools,
   status,
   isLoading,
   runtimeOverview,
@@ -98,7 +97,7 @@ export function RuntimeInspector({
       </motion.div>
 
       <footer className="shrink-0 border-t border-line bg-white px-3 py-1.5 text-[9px] text-muted">
-        Focus mode · {tools.length} tool calls · {events.length} runtime events
+        Focus mode · click a node or span to inspect it
       </footer>
     </Card>
   );
@@ -474,54 +473,56 @@ function EmptyInspector({
 }: {
   runtimeOverview: RuntimeInspectorProps['runtimeOverview'];
 }) {
+  const evaluationLabel =
+    runtimeOverview.evaluationScore === undefined
+      ? 'Pending'
+      : `${Math.round(runtimeOverview.evaluationScore * 100)}%`;
+
+  const sections = [
+    {
+      id: 'context',
+      title: 'Runtime Context',
+      meta: <Badge>{runtimeOverview.progress}%</Badge>,
+      children: (
+        <div className="space-y-1">
+          <RuntimeContextRow label="Task" value={truncate(runtimeOverview.taskLabel, 30)} />
+          <RuntimeContextRow label="Tools" value={String(runtimeOverview.toolCount)} />
+          <RuntimeContextRow label="Knowledge" value={String(runtimeOverview.citationCount)} />
+          <RuntimeContextRow label="Memory" value={String(runtimeOverview.memoryCount)} />
+          <RuntimeContextRow label="Events" value={String(runtimeOverview.eventCount)} />
+          <RuntimeContextRow label="Last event" value={runtimeOverview.latestEvent ?? 'None'} />
+        </div>
+      ),
+    },
+    {
+      id: 'path',
+      title: 'Runtime Path',
+      meta: <Badge>{runtimeOverview.availableSignals.length}</Badge>,
+      children: (
+        <div className="space-y-2">
+          {runtimeOverview.availableSignals.map((signal) => (
+            <RuntimeObjectPreview key={signal.label} label={signal.label} detail={signal.value} />
+          ))}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto">
-      <section className="border-b border-line bg-blue-50/60 p-3">
-        <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-blue-700">
-          Selected Runtime Object
+      <section className="border-b border-line bg-white p-3">
+        <div className="grid grid-cols-3 gap-2">
+          <OverviewStat label="Step" value={truncate(runtimeOverview.currentStep, 14)} />
+          <OverviewStat label="Progress" value={`${runtimeOverview.progress}%`} />
+          <OverviewStat label="Eval" value={evaluationLabel} />
         </div>
-        <h3 className="mt-1 text-sm font-semibold text-ink">Runtime overview</h3>
-        <p className="mt-2 text-xs leading-5 text-muted">
-          Select a graph node or timeline span to inspect the runtime object that produced it.
+        <p className="mt-2 text-[10px] leading-4 text-muted">
+          Select a graph node or timeline span to inspect the runtime object behind it.
         </p>
       </section>
 
       <section className="border-b border-line bg-white p-3">
-        <div className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
-          Runtime Context
-        </div>
-        <div className="space-y-2">
-          <RuntimeContextRow label="Model" value={runtimeOverview.model} />
-          <RuntimeContextRow label="Environment" value={runtimeOverview.environment} />
-          <RuntimeContextRow label="Task" value={truncate(runtimeOverview.taskLabel, 28)} />
-          <RuntimeContextRow label="Current step" value={runtimeOverview.currentStep} />
-          <RuntimeContextRow label="Progress" value={`${runtimeOverview.progress}%`} />
-        </div>
-      </section>
-
-      <section className="border-b border-line bg-slate-50/60 p-3">
-        <div className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
-          Live Runtime Signals
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <RuntimeContextRow label="Events" value={String(runtimeOverview.eventCount)} />
-          <RuntimeContextRow label="Tools" value={String(runtimeOverview.toolCount)} />
-          <RuntimeContextRow label="Knowledge" value={String(runtimeOverview.citationCount)} />
-          <RuntimeContextRow label="Memory" value={String(runtimeOverview.memoryCount)} />
-          <RuntimeContextRow
-            label="Evaluation"
-            value={
-              runtimeOverview.evaluationScore === undefined
-                ? 'Pending'
-                : `${Math.round(runtimeOverview.evaluationScore * 100)}%`
-            }
-          />
-          <RuntimeContextRow label="Last event" value={runtimeOverview.latestEvent ?? 'None'} />
-        </div>
-      </section>
-
-      <section className="border-b border-line bg-white p-3">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-1 flex items-center justify-between">
           <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
             Runtime Telemetry
           </span>
@@ -532,16 +533,18 @@ function EmptyInspector({
         </Suspense>
       </section>
 
-      <section className="bg-white p-3">
-        <div className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
-          Runtime Path
-        </div>
-        <div className="space-y-2">
-          {runtimeOverview.availableSignals.map((signal) => (
-            <RuntimeObjectPreview key={signal.label} label={signal.label} detail={signal.value} />
-          ))}
-        </div>
-      </section>
+      <div className="p-3">
+        <Accordion items={sections} defaultOpenId="" variant="flush" />
+      </div>
+    </div>
+  );
+}
+
+function OverviewStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">{label}</div>
+      <div className="mt-0.5 font-mono text-sm font-semibold text-ink">{value}</div>
     </div>
   );
 }

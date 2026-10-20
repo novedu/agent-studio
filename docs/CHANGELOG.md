@@ -2,6 +2,13 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Inspector density pass
+
+- The default inspector is now three blocks: headline numbers (step / progress / eval), the telemetry chart, and two collapsed sections.
+- `Runtime Context` and `Runtime Path` moved behind disclosure. Nothing was removed, only re-tiered.
+- Removed duplicated fields: `Model` / `Environment` now appear only in the top bar; event and tool counts no longer repeat in the inspector footer.
+- Added a regression test for the quiet default state and on-demand disclosure.
+
 ## Unreleased - Runtime telemetry
 
 - Added a live event-rate chart to the Runtime Inspector, fed by the existing SSE event stream.

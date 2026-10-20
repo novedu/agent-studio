@@ -84,4 +84,57 @@ describe('RuntimeInspector', () => {
     });
     container.remove();
   });
+
+  it('keeps the default overview quiet and reveals details on demand', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | undefined;
+
+    act(() => {
+      root = createRoot(container);
+      root.render(
+        <RuntimeInspector
+          nodes={[]}
+          events={[]}
+          plan={null}
+          memory={[]}
+          citations={[]}
+          tools={[]}
+          status="idle"
+          isLoading={false}
+          runtimeOverview={{ ...runtimeOverview, progress: 0, currentStep: 'Waiting for task' }}
+          runtimeObjects={[]}
+        />,
+      );
+    });
+
+    const html = container.textContent ?? '';
+
+    // Default state shows the three headline numbers plus the telemetry panel.
+    expect(html).toContain('Runtime Telemetry');
+    expect(html).toContain('Step');
+    expect(html).toContain('Progress');
+    expect(html).toContain('Eval');
+
+    // Collapsed by default, and the duplicated runtime context fields are gone.
+    expect(html).toContain('Runtime Context');
+    expect(html).not.toContain('Last event');
+    expect(html).not.toContain('Environment');
+
+    const contextButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      (button.textContent ?? '').includes('Runtime Context'),
+    );
+    expect(contextButton).toBeTruthy();
+
+    act(() => {
+      contextButton?.click();
+    });
+
+    expect(container.textContent ?? '').toContain('Last event');
+
+    act(() => {
+      root?.unmount();
+    });
+    container.remove();
+  });
 });

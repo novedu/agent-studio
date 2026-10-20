@@ -2,6 +2,12 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Dock tabs
+
+- The runtime dock now shows one view at a time (Graph / Timeline) with a segmented switch, giving each view the full dock width instead of a 48/52 split. Graph fit goes from roughly 45% to roughly 66% at the same window size.
+- Both views stay mounted, so switching keeps zoom, filters and selection; the graph re-fits on resize when the user has not panned or zoomed.
+- The Collapse control moved into the shared dock bar, so it no longer competes with the timeline toolbar for space.
+
 ## Unreleased - Density and graph fit pass
 
 - `Runtime Graph` now fits its content for real: scale is derived from the viewport and the graph bounding box (`graph-fit.ts`), instead of the previous hard-coded 86%. The scroll area matches the scaled content, so nodes can no longer be clipped out of reach, and drag-to-pan moves the viewport instead of a CSS offset.

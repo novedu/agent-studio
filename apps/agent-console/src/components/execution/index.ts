@@ -1,3 +1,5 @@
+export { DockViewSwitch } from './DockViewSwitch';
+export type { DockView } from './DockViewSwitch';
 export { ExecutionExplorer } from './ExecutionExplorer';
 export { ExecutionGraph } from './ExecutionGraph';
 export { ExecutionGraphEmptyState } from './ExecutionGraphEmptyState';

@@ -81,6 +81,28 @@ export function ExecutionGraph({
     fitView();
   }, [fitView]);
 
+  // The dock swaps between graph and timeline, so the viewport can go from
+  // zero width to full width without graph dimensions changing. Re-fit on
+  // resize so the first visible frame is already correct.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        if (interactedRef.current) return;
+        if (el.clientWidth === 0 || el.clientHeight === 0) return;
+        fitView();
+      });
+    });
+    observer.observe(el);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [fitView]);
+
   const zoomBy = useCallback((delta: number) => {
     interactedRef.current = true;
     setScale((value) =>

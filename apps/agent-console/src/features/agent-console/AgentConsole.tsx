@@ -2,10 +2,12 @@ import { ChevronDownIcon, PlayIcon } from '../../components/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChatPanel } from '../../components/chat/ChatPanel';
 import {
+  DockViewSwitch,
   ExecutionExplorer,
   ExecutionGraphEmptyState,
   ExecutionTimeline,
   StepDrawer,
+  type DockView,
 } from '../../components/execution';
 import {
   buildExecutionNodes,
@@ -82,6 +84,7 @@ export function AgentConsole() {
   const [highlightedMemoryId, setHighlightedMemoryId] = useState<string>();
   const [highlightedTraceId, setHighlightedTraceId] = useState<string>();
   const [runtimeDockExpanded, setRuntimeDockExpanded] = useState(false);
+  const [dockView, setDockView] = useState<DockView>('graph');
   const [runtimeDockManuallyToggled, setRuntimeDockManuallyToggled] = useState(false);
   const focusedObjectType = focusedRuntimeObject?.type;
   const focusedObjectId = focusedRuntimeObject?.id;
@@ -280,10 +283,29 @@ export function AgentConsole() {
             />
           </div>
 
-          <div className="min-h-0 min-w-0 overflow-hidden border-t border-line bg-white">
+          <div className="flex min-h-0 min-w-0 flex-col overflow-hidden border-t border-line bg-white">
             {runtimeDockExpanded ? (
-              <div className="grid h-full min-h-0 min-w-0 overflow-hidden lg:grid-cols-[minmax(0,0.48fr)_minmax(0,0.52fr)] 2xl:grid-cols-[minmax(0,0.52fr)_minmax(0,0.48fr)]">
-                <div className="min-h-0 min-w-0 overflow-hidden border-b border-line lg:border-b-0 lg:border-r">
+              <>
+                <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-line bg-white px-2">
+                  <DockViewSwitch value={dockView} onChange={setDockView} />
+                  <button
+                    type="button"
+                    onClick={handleRuntimeDockToggle}
+                    className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-md border border-line bg-white px-2 text-[10px] font-semibold text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
+                  >
+                    <ChevronDownIcon className="h-3 w-3" />
+                    Collapse
+                  </button>
+                </div>
+
+                {/* Both views stay mounted so switching keeps zoom, filters and selection. */}
+                <div
+                  className={
+                    dockView === 'graph'
+                      ? 'min-h-0 flex-1 overflow-hidden'
+                      : 'hidden min-h-0 flex-1 overflow-hidden'
+                  }
+                >
                   {hasTaskActivity ? (
                     <ExecutionExplorer
                       nodes={displayNodes}
@@ -297,26 +319,22 @@ export function AgentConsole() {
                   )}
                 </div>
 
-                <div className="min-h-0 min-w-0 overflow-hidden">
+                <div
+                  className={
+                    dockView === 'timeline'
+                      ? 'min-h-0 flex-1 overflow-hidden'
+                      : 'hidden min-h-0 flex-1 overflow-hidden'
+                  }
+                >
                   <ExecutionTimeline
                     nodes={displayNodes}
                     runtimeObjects={runtimeObjects}
                     activeNodeId={activeNodeId}
                     onSelectNode={handleTimelineSelect}
                     onStart={() => runServerTask(defaultTask)}
-                    dockAction={
-                      <button
-                        type="button"
-                        onClick={handleRuntimeDockToggle}
-                        className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-md border border-line bg-white px-2 text-[10px] font-semibold text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
-                      >
-                        <ChevronDownIcon className="h-3 w-3" />
-                        Collapse
-                      </button>
-                    }
                   />
                 </div>
-              </div>
+              </>
             ) : (
               <RuntimeDockCollapsed
                 overview={runtimeOverview}

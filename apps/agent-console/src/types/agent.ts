@@ -13,6 +13,8 @@ export interface Message {
   role: MessageRole;
   content: string;
   createdAt: number;
+  /** Set when the SSE stream dropped before the answer finished. */
+  interrupted?: boolean;
 }
 
 export type ConsoleMessage = Message;

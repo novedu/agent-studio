@@ -314,6 +314,7 @@ export function AgentConsole() {
               errorMessage={lastError}
               onRetry={latestUserMessage ? () => runServerTask(latestUserMessage.content) : undefined}
               onDismissError={() => useAgentStore.getState().setLastError(undefined)}
+              onRetryMessage={(question) => runServerTask(question)}
             />
           </div>
 

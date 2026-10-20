@@ -28,6 +28,7 @@ interface ChatPanelProps {
   errorMessage?: string;
   onRetry?: () => void;
   onDismissError?: () => void;
+  onRetryMessage?: (question: string) => void;
 }
 
 export function ChatPanel({
@@ -51,6 +52,7 @@ export function ChatPanel({
   errorMessage,
   onRetry,
   onDismissError,
+  onRetryMessage,
 }: ChatPanelProps) {
   const messageViewportRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -70,6 +72,16 @@ export function ChatPanel({
   }
 
   const showRuntimePreview = !hasTaskActivity;
+
+  // A retry repeats the user turn that produced an interrupted answer.
+  function questionBefore(messageId: string): string | undefined {
+    const index = messages.findIndex((message) => message.id === messageId);
+    if (index < 0) return undefined;
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      if (messages[cursor].role === 'user') return messages[cursor].content;
+    }
+    return undefined;
+  }
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col bg-white">
@@ -138,6 +150,14 @@ export function ChatPanel({
                   onRuntimeObjectSelect={onRuntimeObjectSelect}
                   runtimeOverview={runtimeOverview}
                   runtimeObjects={runtimeObjects}
+                  onRetry={
+                    message.interrupted && onRetryMessage
+                      ? () => {
+                          const question = questionBefore(message.id);
+                          if (question) onRetryMessage(question);
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </div>

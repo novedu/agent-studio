@@ -2,6 +2,14 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Interrupted answers and per-message retry
+
+- When the SSE stream drops mid-answer the streaming message is flagged `interrupted`, keeps whatever text already arrived, and shows a "连接中断，这条回答没有完成" bar with a "重试这条" action that repeats that user turn.
+- The queued replay is flushed on transport errors, so the transcript ends where the connection ended instead of a few frames later.
+- A closed stream is only treated as an interruption when the replay queue is empty and the task is still running; a normal task_complete closes the stream before the paced replay finishes.
+- `task_complete` clears `lastError`, so a successful retry no longer leaves a stale error banner on screen.
+- Added `interrupted.test.ts` covering the flag, partial text retention, and the no-op case.
+
 ## Unreleased - No stale graph after reload
 
 - The dock now keys off real runtime activity (`events` / `tools`) instead of chat history. After a reload the transcript is restored but events are not, so the dock shows its empty state instead of seven "waiting" nodes with zero trace behind them.

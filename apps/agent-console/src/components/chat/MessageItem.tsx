@@ -15,6 +15,7 @@ interface MessageItemProps {
   onRuntimeObjectSelect?: (object: RuntimeObject) => void;
   runtimeOverview?: RuntimeOverview;
   runtimeObjects?: RuntimeObject[];
+  onRetry?: () => void;
 }
 
 export function MessageItem({
@@ -25,6 +26,7 @@ export function MessageItem({
   onRuntimeObjectSelect,
   runtimeOverview,
   runtimeObjects = [],
+  onRetry,
 }: MessageItemProps) {
   const isUser = message.role === 'user';
   const isEmptyAssistant = !isUser && message.content.length === 0;
@@ -109,6 +111,23 @@ export function MessageItem({
           </ReactMarkdown>
         )}
         {isStreaming && !isEmptyAssistant && <StreamingCursor />}
+
+        {message.interrupted ? (
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1">
+            <span className="text-[10px] font-medium text-amber-800">
+              连接中断，这条回答没有完成
+            </span>
+            {onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex h-5 shrink-0 cursor-pointer items-center rounded border border-amber-300 bg-white px-1.5 text-[10px] font-semibold text-amber-800 transition-colors duration-200 hover:bg-amber-100"
+              >
+                重试这条
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </article>
   );

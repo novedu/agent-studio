@@ -14,11 +14,13 @@ export function useAgentStream() {
   const subscriptionRef = useRef<AgentEventSubscription | null>(null);
   const taskIdRef = useRef<string | null>(null);
   const eventQueueRef = useRef<AgentEvent[]>([]);
+  const streamClosedRef = useRef(false);
   const timerRef = useRef<number | null>(null);
   const beginTask = useAgentStore((state) => state.beginTask);
   const updateFromEvent = useAgentStore((state) => state.updateFromEvent);
   const setStatus = useAgentStore((state) => state.setStatus);
   const setLastError = useAgentStore((state) => state.setLastError);
+  const markInterrupted = useAgentStore((state) => state.markInterrupted);
 
   const clearQueuedEvents = useCallback(() => {
     eventQueueRef.current = [];
@@ -32,6 +34,12 @@ export function useAgentStream() {
     const event = eventQueueRef.current.shift();
     if (!event) {
       timerRef.current = null;
+      // The queue can be empty between batches; only a closed stream plus a
+      // still-running task means the answer really was cut off.
+      if (streamClosedRef.current && useAgentStore.getState().status === 'running') {
+        useAgentStore.getState().markInterrupted();
+        useAgentStore.getState().setLastError('任务在完成前中断了，可以重试这条。');
+      }
       return;
     }
 
@@ -59,6 +67,7 @@ export function useAgentStream() {
       subscriptionRef.current?.close();
       subscriptionRef.current = null;
       taskIdRef.current = null;
+      streamClosedRef.current = false;
       clearQueuedEvents();
       setLastError(undefined);
       beginTask(input);
@@ -70,13 +79,24 @@ export function useAgentStream() {
         subscriptionRef.current = subscribeAgentEvents(task.taskId, {
           onEvent: dispatchEvent,
           onError: () => {
-            setStatus('error');
-            setLastError('与运行时服务的连接中断了。确认 Agent Server 还在运行，然后重试。');
-            writeActiveAssistantMessage('Runtime server connection lost. Check the Agent Server and rerun the demo task.');
+            streamClosedRef.current = true;
+            // Stop replaying buffered events: the transcript should end where
+            // the connection actually ended, not a few frames later.
+            clearQueuedEvents();
+            markInterrupted();
+            setLastError('与运行时服务的连接中断了，这条回答没有完成。确认 Agent Server 还在运行，再点重试。');
           },
           onClose: () => {
             subscriptionRef.current = null;
             taskIdRef.current = null;
+            streamClosedRef.current = true;
+            // The server closes the stream as soon as it finishes sending, which
+            // can be before the paced replay has applied task_complete. Only an
+            // empty queue plus a running task is a genuine interruption.
+            if (eventQueueRef.current.length === 0 && useAgentStore.getState().status === 'running') {
+              markInterrupted();
+              setLastError('任务在完成前中断了，可以重试这条。');
+            }
           },
         });
       } catch {
@@ -85,7 +105,7 @@ export function useAgentStream() {
         writeActiveAssistantMessage('Unable to start the Agent Server task. Start the runtime server, then run the demo again.');
       }
     },
-    [beginTask, clearQueuedEvents, dispatchEvent, setLastError, setStatus],
+    [beginTask, clearQueuedEvents, dispatchEvent, markInterrupted, setLastError, setStatus],
   );
 
   const stop = useCallback(() => {

@@ -50,6 +50,8 @@ interface AgentState {
   /** Human readable failure shown above the composer. */
   lastError?: string;
   setLastError: (message?: string) => void;
+  /** Flags the message that was streaming when the connection dropped. */
+  markInterrupted: () => void;
   /** Clears the visible transcript and starts a fresh conversation. */
   startNewConversation: () => void;
 }
@@ -156,6 +158,20 @@ export const useAgentStore = create<AgentState>()(
   setState: (agentState) => set({ state: agentState }),
   setStatus: (status) => set({ status, isStreaming: status === 'running' }),
   setLastError: (message) => set({ lastError: message }),
+  markInterrupted: () => {
+    const { activeAssistantMessageId, messages } = get();
+    if (!activeAssistantMessageId) {
+      set({ status: 'error', isStreaming: false });
+      return;
+    }
+    set({
+      status: 'error',
+      isStreaming: false,
+      messages: messages.map((message) =>
+        message.id === activeAssistantMessageId ? { ...message, interrupted: true } : message,
+      ),
+    });
+  },
 
   startNewConversation: () => {
     get().reset();
@@ -239,6 +255,7 @@ function handleAgentEvent(set: StoreSet, get: StoreGet, event: AgentEvent): void
         status: getTaskCompleteStatus(payload),
         isStreaming: false,
         activeAssistantMessageId: undefined,
+        lastError: undefined,
       });
       break;
     case 'task_cancelled':

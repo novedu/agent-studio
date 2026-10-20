@@ -2,6 +2,11 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Fresh media and honest durations
+
+- Replaced all seven README screenshots with captures of the current UI (dock tabs, telemetry chart, collapsed inspector sections).
+- A completed runtime object now shows `—` instead of `pending` when it has no recorded duration; `pending` is reserved for objects that are still waiting.
+
 ## Unreleased - Dock tabs
 
 - The runtime dock now shows one view at a time (Graph / Timeline) with a segmented switch, giving each view the full dock width instead of a 48/52 split. Graph fit goes from roughly 45% to roughly 66% at the same window size.

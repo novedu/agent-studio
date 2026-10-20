@@ -191,7 +191,10 @@ function RuntimeObjectInspector({
           <Badge tone={getStatusTone(object.status)}>{object.status}</Badge>
         </header>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <Metric label="Duration" value={formatDuration(object.duration)} />
+          <Metric
+            label="Duration"
+            value={object.status === 'waiting' ? 'pending' : formatDuration(object.duration)}
+          />
           <Metric label="Token" value={String(object.tokenCount ?? 0)} />
           <Metric label="Retry" value={String(object.retryCount ?? 0)} />
           <Metric label="Lifecycle" value={object.lifecycle} />
@@ -618,6 +621,9 @@ function readTokenCount(payload: unknown): number {
 }
 
 function formatDuration(duration?: number): string {
-  if (duration === undefined) return 'pending';
+  // A completed object can legitimately have no duration (for example a node
+  // that is projected from a terminal event), so show a dash instead of the
+  // misleading "pending".
+  if (duration === undefined) return '—';
   return duration >= 1000 ? `${(duration / 1000).toFixed(1)}s` : `${duration}ms`;
 }

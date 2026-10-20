@@ -3,6 +3,9 @@ dist/
 build/
 coverage/
 
+# 面试资料，仅本地保留
+docs/interview/
+
 *.log
 *.tsbuildinfo
 .DS_Store

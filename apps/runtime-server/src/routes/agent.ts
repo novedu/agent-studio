@@ -74,7 +74,7 @@ export function createAgentRouteHandlers(deps: AgentRouteDependencies): AgentRou
         return createApiError('INVALID_INPUT', 'input is required');
       }
 
-      const task = deps.taskManager.createTask(input, request.userContext);
+      const task = deps.taskManager.createTask(input, request.userContext, request.conversationId);
       deps.taskManager.startTask(task.taskId);
 
       return {

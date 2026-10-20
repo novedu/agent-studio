@@ -2,6 +2,14 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Multi-turn conversations
+
+- The client now owns a `conversationId` and sends it with every task, so a follow-up message continues the previous conversation instead of starting a new one.
+- The runtime server caches one runtime bundle per conversation (planner hooks, memory, conversation history) and bounds the cache at 20 conversations.
+- `Agent.run()` accepts an existing conversation id and reuses it; a missing id still mints a fresh conversation.
+- Prompts replay a bounded window of history (24 messages) while always keeping the system prompt, so long conversations stay cheap.
+- Added `conversation-context-test.ts` (reuse, isolation between conversations, missing id, bounded history) and a client test asserting the conversation id is sent.
+
 ## Unreleased - Mock mode that does not look broken
 
 - `MockLLMProvider` is now input-aware instead of draining a fixed queue: greeting, capability questions, the scripted sales walkthrough, and everything else each get their own locally rendered answer.

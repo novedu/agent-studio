@@ -14,6 +14,9 @@ import { AgentState } from './state';
 import type { LLMProvider } from '@runtime/llm';
 import { MemoryManager } from '@runtime/memory/memory-manager';
 
+/** How many past messages are replayed into a prompt (keeps follow-up turns cheap). */
+const MAX_REPLAYED_HISTORY = 24;
+
 function generateId(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
@@ -368,9 +371,13 @@ export class WorkflowRunner {
       });
     }
 
+    // Replay a bounded window: long conversations must not grow the prompt
+    // without limit. System messages are always kept above.
+    const recentMessages = messages.slice(-MAX_REPLAYED_HISTORY);
+
     return [
       ...systemMessages,
-      ...messages.map((message) => ({
+      ...recentMessages.map((message) => ({
         id: message.id,
         role: message.role,
         content: message.content,

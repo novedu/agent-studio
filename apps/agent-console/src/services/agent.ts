@@ -70,11 +70,14 @@ const supportedEventTypes: AgentEventType[] = [
   'task_complete',
 ];
 
-export async function createAgentTask(input: string): Promise<CreateAgentTaskResponse> {
+export async function createAgentTask(
+  input: string,
+  conversationId?: string,
+): Promise<CreateAgentTaskResponse> {
   const response = await fetch(`${getAgentServerURL()}/api/agent/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ input }),
+    body: JSON.stringify(conversationId ? { input, conversationId } : { input }),
   });
 
   if (!response.ok) {

@@ -14,6 +14,11 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
+export interface AgentRunOptions {
+  /** Continue an existing conversation instead of starting a new one. */
+  conversationId?: string;
+}
+
 export interface AgentConfig {
   llmProvider: LLMProvider;
   toolRegistry: ToolRegistry;
@@ -55,10 +60,18 @@ export class Agent {
     });
   }
 
-  async run(userInput: string): Promise<AgentTrace> {
+  async run(userInput: string, options: AgentRunOptions = {}): Promise<AgentTrace> {
     const taskId = generateId();
     const startTime = Date.now();
-    const conversation = this.conversationManager.createConversation(userInput.slice(0, 20));
+    const requestedConversationId = options.conversationId?.trim();
+    const existingConversation = requestedConversationId
+      ? this.conversationManager.getConversation(requestedConversationId)
+      : undefined;
+    // Reusing the conversation is what makes follow-up turns see previous
+    // messages; a brand new id falls back to creating one.
+    const conversation =
+      existingConversation ??
+      this.conversationManager.createConversation(userInput.slice(0, 20), requestedConversationId || undefined);
 
     const userMessage = this.conversationManager.addMessage(conversation.id, {
       role: 'user',

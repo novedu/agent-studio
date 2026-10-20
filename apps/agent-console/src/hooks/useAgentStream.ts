@@ -62,7 +62,8 @@ export function useAgentStream() {
       beginTask(input);
 
       try {
-        const task = await createAgentTask(input);
+        const conversationId = useAgentStore.getState().ensureConversationId();
+        const task = await createAgentTask(input, conversationId);
         taskIdRef.current = task.taskId;
         subscriptionRef.current = subscribeAgentEvents(task.taskId, {
           onEvent: dispatchEvent,

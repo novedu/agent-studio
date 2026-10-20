@@ -10,6 +10,7 @@ export class InMemoryTaskRepository implements TaskRepository {
       taskId: createTaskId(),
       input: input.input,
       userContext: input.userContext,
+      conversationId: input.conversationId,
       status: 'queued',
       progress: 0,
       retryCount: 0,

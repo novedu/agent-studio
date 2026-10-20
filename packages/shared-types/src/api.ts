@@ -37,6 +37,8 @@ export interface AgentServerEvent<TPayload = unknown> {
 export interface CreateAgentTaskRequest {
   input: string;
   userContext?: UserContext;
+  /** Client-owned id so follow-up tasks share one conversation. */
+  conversationId?: string;
 }
 
 export interface CreateAgentTaskResponse {
@@ -181,6 +183,7 @@ export interface RuntimeTaskContext {
   taskId: string;
   input: string;
   userContext?: UserContext;
+  conversationId?: string;
   signal?: AbortSignal;
   emit: AgentEventSink;
 }

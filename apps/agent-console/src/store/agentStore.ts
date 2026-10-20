@@ -34,6 +34,9 @@ interface AgentState {
 
   workflow: WorkflowEvent[];
   memories: MemoryRecord[];
+  /** Survives task resets so follow-up messages stay in one conversation. */
+  conversationId?: string;
+  ensureConversationId: () => string;
   isStreaming: boolean;
   activeAssistantMessageId?: string;
   answerBuffer: string;
@@ -88,6 +91,13 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       answerBuffer: '',
     }),
 
+  ensureConversationId: () => {
+    const current = get().conversationId;
+    if (current) return current;
+    const next = createId('conv');
+    set({ conversationId: next });
+    return next;
+  },
   beginTask: (input) => {
     const assistantMessageId = createId('msg');
     get().reset();

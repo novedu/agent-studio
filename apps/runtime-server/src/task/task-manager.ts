@@ -21,8 +21,8 @@ export class TaskManager {
     this.publishEvent = config.publishEvent;
   }
 
-  createTask(input: string, userContext?: UserContext): TaskRecord {
-    const task = this.repository.create({ input, userContext });
+  createTask(input: string, userContext?: UserContext, conversationId?: string): TaskRecord {
+    const task = this.repository.create({ input, userContext, conversationId });
     this.publish('task_created', task.taskId, {
       taskId: task.taskId,
       input: task.input,
@@ -56,6 +56,7 @@ export class TaskManager {
         taskId,
         input: task.input,
         userContext: task.userContext,
+        conversationId: task.conversationId,
         signal: controller.signal,
         emit: (event) => this.handleRuntimeEvent(event),
       })

@@ -53,7 +53,11 @@ interface PlannerRuntimeHooks {
   onPlanFailed: (error: Error) => void;
 }
 
+/** Upper bound on remembered conversations so the server cannot grow forever. */
+const MAX_REMEMBERED_CONVERSATIONS = 20;
+
 export class AgentRuntimeAdapter implements AgentRuntimePort {
+  private bundles = new Map<string, RuntimeBundle>();
   private traceManager: TraceManager;
   private evaluator: Evaluator;
   private metrics: AgentMetrics;
@@ -71,7 +75,7 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
     });
     const eventFactory = createServerEventFactory(context.taskId);
     let plannerSpan: ReturnType<TraceManager['startSpan']> | undefined;
-    const bundle = this.createRuntimeBundle({
+    const plannerHooks: PlannerRuntimeHooks = {
       onPlanStarted: (input) => {
         plannerSpan = this.traceManager.startSpan({
           traceId: observabilityTrace.traceId,
@@ -100,7 +104,8 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
         });
         this.traceManager.recordSpan(span.end('failed', { error: error.message }));
       },
-    }, context.userContext);
+    };
+    const bundle = this.getOrCreateBundle(context.conversationId, plannerHooks, context.userContext);
     let finalAnswerStreamed = false;
 
     emitIfActive(context, eventFactory('plan_start', {
@@ -119,7 +124,10 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
       taskId: context.taskId,
       component: 'WorkflowRunner',
     });
-    const trace = await bundle.agent.run(context.input);
+    const trace = await bundle.agent.run(context.input, {
+      conversationId: context.conversationId,
+    });
+    this.rememberBundle(trace.conversationId, bundle);
     this.traceManager.recordSpan(workflowSpan.end(trace.success ? 'success' : 'failed', {
       runtimeTaskId: trace.taskId,
       totalSteps: trace.steps.length,
@@ -358,6 +366,31 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
         activeSpans.delete(`llm:${runtimeEvent.messageId}`);
       }
     });
+  }
+
+  private getOrCreateBundle(
+    conversationId: string | undefined,
+    plannerHooks: PlannerRuntimeHooks,
+    userContext?: UserContext,
+  ): RuntimeBundle {
+    const key = conversationId?.trim();
+    if (key) {
+      const cached = this.bundles.get(key);
+      if (cached) return cached;
+    }
+
+    const bundle = this.createRuntimeBundle(plannerHooks, userContext);
+    if (key) this.rememberBundle(key, bundle);
+    return bundle;
+  }
+
+  private rememberBundle(conversationId: string, bundle: RuntimeBundle): void {
+    this.bundles.set(conversationId, bundle);
+    while (this.bundles.size > MAX_REMEMBERED_CONVERSATIONS) {
+      const oldest = this.bundles.keys().next().value;
+      if (!oldest) break;
+      this.bundles.delete(oldest);
+    }
   }
 
   private createRuntimeBundle(plannerHooks: PlannerRuntimeHooks, userContext?: UserContext): RuntimeBundle {

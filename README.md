@@ -396,7 +396,16 @@ const llmProvider = realLLMProvider ?? mockLLMProvider
 
 向量检索与文档上传管线是明确的**下一步计划**，不是正在实现中的能力。
 
-### 4 · Runtime 架构
+### 4 · 多轮对话
+
+会话 id 由客户端持有并随每个任务发送（`conversationId`），服务端按它缓存一份 runtime bundle——planner hooks、memory、conversation history 都在里面。
+
+- 追问会落到同一个 `ConversationManager`，上一轮的用户消息与助手回答会重新进入 prompt。
+- 缓存上限 20 个会话，超出后按最早写入淘汰。
+- prompt 只回放最近 24 条消息（system prompt 始终保留），避免长会话把 token 撑爆。
+- 没带 id 的请求会自动新建会话，行为与之前一致。
+
+### 5 · Runtime 架构
 
 monorepo 结构：`apps/`（agent-console、runtime-server）+ `packages/`（agent-runtime、shared-types、shared-utils）。
 

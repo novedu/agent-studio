@@ -7,9 +7,9 @@ function generateId(): string {
 export class ConversationManager {
   private conversations = new Map<string, Conversation>();
 
-  createConversation(title?: string): Conversation {
+  createConversation(title?: string, id?: string): Conversation {
     const conversation: Conversation = {
-      id: generateId(),
+      id: id ?? generateId(),
       title: title || '新会话',
       messages: [],
       createdAt: Date.now(),

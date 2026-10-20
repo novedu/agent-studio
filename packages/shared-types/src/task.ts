@@ -8,6 +8,7 @@ export interface TaskRecord {
   taskId: string;
   input: string;
   userContext?: UserContext;
+  conversationId?: string;
   status: TaskStatus;
   currentStep?: string;
   progress: number;
@@ -25,6 +26,7 @@ export interface TaskRecord {
 export interface CreateTaskInput {
   input: string;
   userContext?: UserContext;
+  conversationId?: string;
   maxRetry?: number;
 }
 

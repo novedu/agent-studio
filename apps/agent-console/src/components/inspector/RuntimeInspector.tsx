@@ -6,6 +6,15 @@ import { EvaluationDashboard } from './EvaluationDashboard';
 import { KnowledgeExplorer } from './KnowledgeExplorer';
 import { MemoryExplorer } from './MemoryExplorer';
 import { RuntimeLogs } from './RuntimeLogs';
+import { lazy, Suspense } from 'react';
+
+// The chart pulls in ECharts. Loading it lazily keeps the runtime console's
+// first paint free of the chart bundle; the panel streams in right after.
+const EventRateChart = lazy(() =>
+  import('../../features/metrics/EventRateChart').then(module => ({
+    default: module.EventRateChart,
+  })),
+);
 import { TraceExplorer } from './TraceExplorer';
 import type { RuntimeInspectorProps } from './inspector-types';
 
@@ -509,6 +518,18 @@ function EmptyInspector({
           />
           <RuntimeContextRow label="Last event" value={runtimeOverview.latestEvent ?? 'None'} />
         </div>
+      </section>
+
+      <section className="border-b border-line bg-white p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Runtime Telemetry
+          </span>
+          <span className="text-[9px] text-muted">last 60s</span>
+        </div>
+        <Suspense fallback={<div className="h-24 w-full animate-pulse rounded bg-slate-100" />}>
+          <EventRateChart />
+        </Suspense>
       </section>
 
       <section className="bg-white p-3">

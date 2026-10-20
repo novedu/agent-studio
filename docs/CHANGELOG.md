@@ -2,6 +2,10 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - No stale graph after reload
+
+- The dock now keys off real runtime activity (`events` / `tools`) instead of chat history. After a reload the transcript is restored but events are not, so the dock shows its empty state instead of seven "waiting" nodes with zero trace behind them.
+
 ## Unreleased - Chat polish: persistence, markdown, input
 
 - The transcript and `conversationId` persist to `localStorage`; a `New` button in the chat header clears both.

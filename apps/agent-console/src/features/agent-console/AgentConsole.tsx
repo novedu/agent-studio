@@ -68,13 +68,20 @@ export function AgentConsole() {
     [messages],
   );
   const hasTaskActivity = status !== 'idle' || events.length > 0 || Boolean(latestUserMessage);
-  const displayNodes = useMemo(() => (hasTaskActivity ? nodes : []), [hasTaskActivity, nodes]);
+  // The dock only makes sense when this session actually produced runtime events.
+  // After a reload the transcript is restored but events are not, so building the
+  // node skeleton would show seven "waiting" boxes with zero trace behind them.
+  const hasRuntimeActivity = events.length > 0 || tools.length > 0;
+  const displayNodes = useMemo(
+    () => (hasRuntimeActivity ? nodes : []),
+    [hasRuntimeActivity, nodes],
+  );
   const runtimeObjects = useMemo(() => buildRuntimeObjects(displayNodes), [displayNodes]);
   const dependencyEdges = useMemo(
     () => buildRuntimeDependencyEdges(runtimeObjects),
     [runtimeObjects],
   );
-  const currentNodeId = hasTaskActivity ? getCurrentNodeId(displayNodes) : undefined;
+  const currentNodeId = hasRuntimeActivity ? getCurrentNodeId(displayNodes) : undefined;
   const [selectedRuntimeObject, setSelectedRuntimeObject] = useState<RuntimeObject | undefined>();
   const [focusedRuntimeObject, setFocusedRuntimeObject] = useState<FocusedRuntimeObject>();
   const [focusedNodeId, setFocusedNodeId] = useState<string | undefined>(currentNodeId);
@@ -333,7 +340,7 @@ export function AgentConsole() {
                       : 'hidden min-h-0 flex-1 overflow-hidden'
                   }
                 >
-                  {hasTaskActivity ? (
+                  {hasRuntimeActivity ? (
                     <ExecutionExplorer
                       nodes={displayNodes}
                       runtimeObjects={runtimeObjects}

@@ -2,13 +2,21 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Documentation refinement
+
+- Reworked the README opening: Chinese one-liner first, real console screenshot as the hero, capabilities up front.
+- Moved the animated diagram out of the first screen into the screenshot section, labeled as a diagram rather than a product recording.
+- Removed self-referential "built for interviews" framing from README, package.json, and docs.
+- Moved internal interview notes out of the repository and removed superseded archive specifications.
+- Recompressed the demo GIF (2.6 MB to about 52 KB).
+
 ## Agent Studio 2.0
 
 Status: completed.
 
 Implemented:
 
-- Established `/agent` as the portfolio demo center.
+- Established `/agent` as the demo center.
 - Added demo-ready task entry for `分析华东销售下降原因，并生成报告`.
 - Connected the Agent Workspace to real SSE task execution.
 - Added RuntimeObject-driven synchronization across Chat, Graph, Timeline, Inspector, and Drawer.
@@ -21,7 +29,7 @@ Implemented:
 
 Planning update:
 
-- Added a portfolio-first roadmap that prioritizes `/agent` over broad enterprise platform work.
+- Added a demo-first roadmap that prioritizes `/agent` over broad enterprise platform work.
 - Deferred RBAC, SSO, audit, billing, deployment, and team workspace to Agent Studio 3.0.
 - Defined Phase 2 as Runtime Deepening instead of expanding placeholder pages first.
 
@@ -139,16 +147,15 @@ Implemented:
 - Derived Settings data from existing frontend configuration and Zustand state without changing Store or backend contracts.
 - Avoided fake identity, role, audit, API key, deployment, billing, and monitoring features.
 
-## Portfolio Demo Polish
+## Demo Polish
 
 Status: implemented.
 
 Implemented:
 
 - Added root `README.md` with product positioning, architecture, routes, demo flow, setup, verification, and capability boundaries.
-- Added `docs/DEMO_SCRIPT.md` for interview walkthroughs and demo recordings.
-- Added the portfolio review to `docs/archive/PORTFOLIO_REVIEW.md` as an internal historical note.
-- Clarified that Agent Studio is a portfolio-grade Enterprise Agent Runtime Studio MVP, not a fully production-ready enterprise AI platform.
+- Added `docs/DEMO_SCRIPT.md` for demo recordings and walkthroughs.
+- Clarified that Agent Studio is an Enterprise Agent Runtime Studio MVP, not a fully production-ready enterprise AI platform.
 
 ## Milestone 3: Engineering Quality
 

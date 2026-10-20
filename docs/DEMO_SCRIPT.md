@@ -1,6 +1,6 @@
 # Agent Studio Demo Script
 
-Use this script for portfolio demos, interviews, screen recordings, and project walkthroughs.
+Use this script for demos, screen recordings, and project walkthroughs.
 
 ## Demo Goal
 
@@ -47,7 +47,7 @@ Primary input:
 
 ## 3-Minute Demo
 
-Audience: recruiter, hiring manager, or first-round interviewer.
+Audience: non-technical listener (recruiter or first-round screener).
 
 ### 0:00-0:30 Positioning
 
@@ -121,7 +121,7 @@ The project demonstrates both frontend runtime visualization and backend agent i
 
 ## 10-Minute Demo
 
-Audience: frontend / full-stack technical interview.
+Audience: frontend / full-stack engineer.
 
 ### 1. Workspace Overview
 
@@ -234,12 +234,12 @@ Briefly show:
 Keep the message clear:
 
 ```text
-The strongest page is /agent. Other pages support the portfolio story and are intentionally scoped.
+The strongest page is /agent. Other pages support the broader product story and are intentionally scoped.
 ```
 
 ## 30-Minute Demo
 
-Audience: senior frontend, AI platform, or agent infrastructure interview.
+Audience: senior frontend, AI platform, or agent infrastructure engineer.
 
 ### 0-5 Minutes: Product Positioning
 
@@ -253,7 +253,7 @@ Explain:
 Key statement:
 
 ```text
-The project is optimized for job interviews: one advanced page, real runtime capability, explainable architecture, and honest boundaries.
+The project is optimized for explainability: one advanced page, real runtime capability, clear architecture, and honest boundaries.
 ```
 
 ### 5-12 Minutes: Live Runtime Walkthrough
@@ -293,7 +293,7 @@ Runtime Server
   -> SSE event stream
 ```
 
-Focus on interview-relevant details:
+Focus on the details that matter:
 
 - task lifecycle
 - cancel / retry
@@ -346,10 +346,10 @@ Explain:
 Say:
 
 ```text
-Next useful portfolio steps are runtime deepening, richer span tree search, Knowledge Platform, Memory Platform, and Evaluation history. I would not add billing, RBAC, SSO, or multi-tenant features unless the target role requires enterprise SaaS.
+Next useful steps are runtime deepening, richer span tree search, Knowledge Platform, Memory Platform, and Evaluation history. I would not add billing, RBAC, SSO, or multi-tenant features unless the target role requires enterprise SaaS.
 ```
 
-## Interview Q&A
+## Q&A
 
 ### Why not just build a chat UI?
 
@@ -394,7 +394,7 @@ For job-search impact:
 
 ## Demo Checklist
 
-Before recording or interviewing:
+Before recording:
 
 - Runtime Server is running on `3001`.
 - React Console is running on `5173`.

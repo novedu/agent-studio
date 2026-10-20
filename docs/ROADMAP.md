@@ -3,10 +3,10 @@
 This roadmap keeps the project aligned with the current goal:
 
 ```text
-Build a portfolio-grade Agent Runtime Studio that demonstrates real backend capability through a polished /agent workspace.
+Build an Agent Runtime Studio that demonstrates real backend capability through a polished /agent workspace.
 ```
 
-The priority is not enterprise launch readiness yet. The priority is a credible product demo for job search and portfolio review.
+The priority is not enterprise launch readiness yet. The priority is a credible, runnable product demo that explains the runtime end to end.
 
 ## Roadmap Principles
 
@@ -16,11 +16,11 @@ The priority is not enterprise launch readiness yet. The priority is a credible 
 - Timeline debugs execution.
 - Inspector explains the selected runtime object.
 - Backend features should be used when they already exist.
-- Enterprise platform features are planned, but not allowed to distract from the portfolio demo.
+- Enterprise platform features are planned, but not allowed to distract from the /agent demo.
 
 ## Current Backend Readiness
 
-The current backend is sufficient for the portfolio demo.
+The current backend is sufficient for the /agent demo.
 
 Available runtime capabilities:
 
@@ -159,7 +159,6 @@ Turn Dashboard from placeholder into a runtime overview page.
 
 Scope:
 
-Historical specification: `docs/archive/phases/PHASE3_DASHBOARD.md`
 
 - Recent Tasks
 - Recent Failures
@@ -184,7 +183,6 @@ Turn Knowledge from supporting evidence into a real Knowledge Center.
 
 Scope:
 
-Historical specification: `docs/archive/phases/PHASE4_KNOWLEDGE.md`
 
 - Knowledge Sources
 - Document list
@@ -208,7 +206,6 @@ Make memory observable, explainable, and useful for debugging.
 
 Scope:
 
-Historical specification: `docs/archive/phases/PHASE5_MEMORY.md`
 
 - Working Memory
 - Semantic Memory
@@ -242,7 +239,6 @@ Make answer quality measurable across runs.
 
 Scope:
 
-Historical specification: `docs/archive/phases/PHASE6_EVALUATION.md`
 
 - Evaluation History
 - Score Trend
@@ -276,7 +272,6 @@ Move toward LangGraph Studio-style workflow authoring.
 
 Scope:
 
-Historical specification: `docs/archive/phases/PHASE7_WORKFLOW.md`
 
 - Planner Graph
 - Workflow Graph
@@ -312,7 +307,6 @@ Prepare Agent Studio for enterprise usage after the core runtime product is stro
 
 Scope:
 
-Historical specification: `docs/archive/phases/PHASE8_ENTERPRISE.md`
 
 - Workspace
 - Team
@@ -345,7 +339,7 @@ Acceptance:
 
 - The platform can be evaluated for real enterprise deployment.
 
-## Portfolio Demo Package
+## Demo Package
 
 Status: implemented.
 
@@ -353,8 +347,6 @@ Scope:
 
 - Root README
 - Demo script
-- Portfolio review
-- Interview talking points
 - Honest capability boundaries
 - Local run and verification instructions
 
@@ -362,7 +354,6 @@ Implemented:
 
 - Added `README.md`.
 - Added `docs/DEMO_SCRIPT.md`.
-- Archived the portfolio review under `docs/archive/PORTFOLIO_REVIEW.md`.
 - Documented the primary demo path from `/agent` to Dashboard, Knowledge, Memory, Evaluation, Workflow, and Settings.
 - Clarified current real capabilities vs planned enterprise capabilities.
 
@@ -393,7 +384,7 @@ Dashboard productization can ship between 2.0 and 2.1, but it must not replace `
 
 ## Priority Buckets
 
-### P0: Must Finish for Portfolio Demo
+### P0: Must Finish for the /agent Demo
 
 - `/agent` demo flow
 - RuntimeObject synchronization

@@ -1,6 +1,6 @@
 # Screenshots
 
-These screenshots document the primary portfolio demo task:
+These screenshots document the primary demo task:
 
 ```text
 分析华东区域销售下降原因，并生成报告

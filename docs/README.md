@@ -11,7 +11,7 @@ This directory contains the project documentation. The root [README](../README.m
 | [UX.md](UX.md) | Navigation, interaction, state transitions, and evidence flows. |
 | [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) | Design tokens and reusable component rules. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System boundaries, data flow, SSE, and frontend projection. |
-| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | Interview and recording walkthroughs for the Runtime demo. |
+| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | Recording and walkthrough scripts for the Runtime demo. |
 | [CHANGELOG.md](CHANGELOG.md) | Product and implementation history. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development process, code boundaries, and verification commands. |
 
@@ -19,8 +19,4 @@ This directory contains the project documentation. The root [README](../README.m
 
 - [RuntimeObject model](architecture/runtime-object.md): frontend projection used by Graph, Timeline, Inspector, Drawer, Chat, and Evidence.
 - [Screenshots](screenshots/README.md): the frames used by the GitHub project page.
-- [Demo GIF](media/agent-studio-demo.gif): a short visual runtime walkthrough.
-
-## Archive
-
-Historical phase specifications and superseded design notes live under [`archive/`](archive/). They are kept for project history and are not current implementation requirements.
+- [Flow overview](media/agent-studio-demo.gif): an animated diagram of the runtime sequence (not a product recording).

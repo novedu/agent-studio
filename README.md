@@ -1,24 +1,22 @@
-# Agent Studio
+# Agent Studio ｜ AI Agent Runtime Studio
 
 [![CI](https://github.com/novedu/agent-studio/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/novedu/agent-studio/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
 
-> **中文简介** — AI Agent Runtime 控制台：把 Agent 的规划、工具调用、检索、反思与评测过程，变成可观测、可解释的事件流。
->
-> **技术栈** TypeScript · React · Node.js · Zustand · SSE · npm workspaces
->
-> LLM 层支持接入 OpenAI 兼容模型（未配置时 Mock 回退）；RAG 为关键词检索。详见 [Implementation Notes](#implementation-notes)。
+**一句话**：把 AI Agent 的规划、工具调用、检索、反思与评测过程，变成可观察、可调试的事件流。
 
-AI Agent Runtime Studio for planning, execution, observation, memory, retrieval, reflection, and evaluation.
+TypeScript · React · Node.js · Zustand · SSE · npm workspaces ｜ LLM 接入 OpenAI 兼容模型（未配置 Key 时 Mock 回退）｜ RAG 为关键词检索，详见 [Implementation Notes](#implementation-notes)
 
-This is a portfolio project for AI Agent Platform / AI Agent full-stack interviews. It is not a ChatGPT clone, not a dashboard template, and not a fake SaaS shell. The core goal is to make an interviewer believe the candidate understands how an Agent Runtime is built, streamed, inspected, and explained.
+![Agent Studio runtime console](docs/screenshots/02-agent-running.jpg)
 
-![Agent Studio runtime demo](docs/media/agent-studio-demo.gif)
+> Agent 执行是黑盒：调了哪个工具、检索到什么、为什么失败，都看不到。
+> 这个项目用 Runtime Event 记录全过程，并投影到 Chat / Graph / Timeline / Inspector 四个同步视图；
+> 一次演示任务会走完 Planning → Tool Call → Knowledge Retrieval → Memory Update → Reflection → Evaluation → Final Answer。
 
 ## Project Introduction
 
-Agent Studio turns a running AI agent into a runtime console: four synchronized views (Chat / Graph / Timeline / Inspector) projected from a single runtime state model.
+Agent Studio turns a running AI agent into a runtime console: four synchronized views (Chat / Graph / Timeline / Inspector) projected from a single runtime state model. It is not a ChatGPT clone, not a dashboard template, and not a fake SaaS shell.
 
 The main demo starts with:
 
@@ -42,7 +40,7 @@ The `/agent` page is the product center. Chat is the primary workspace. Graph ex
 - **Execution Graph**: compact dependency graph for Planner, Workflow, Tool, Knowledge, Memory, Reflection, Evaluation, and Answer.
 - **Debug Timeline**: runtime spans with component, status, duration, retry, token, metadata, input, and output.
 - **Professional Inspector**: object-driven panels for execution, input, output, reasoning, trace, evidence, memory, evaluation, and logs.
-- **Portfolio demo path**: one-click demo task plus failure recovery demo for Tool Error -> Retry -> Reflection -> Success.
+- **Demo path**: one-click demo task plus failure recovery demo for Tool Error -> Retry -> Reflection -> Success.
 
 ## Architecture
 
@@ -151,6 +149,12 @@ Evaluation Center shows score, criteria, feedback, and quality review for the co
 
 ![Evaluation](docs/screenshots/07-evaluation.jpg)
 
+### Runtime flow overview
+
+An early animated overview of the Planning -> Tool -> Knowledge -> Memory -> Reflection -> Evaluation -> Answer sequence. It is a diagram animation, not a product recording; the real console is shown in the screenshots above.
+
+![Runtime flow overview](docs/media/agent-studio-demo.gif)
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -221,7 +225,6 @@ docs/
 ├── ARCHITECTURE.md
 ├── ROADMAP.md
 ├── DEMO_SCRIPT.md
-├── archive/
 ├── screenshots/
 └── media/
 ```
@@ -301,7 +304,7 @@ Expected demo sequence:
 
 Demo scripts:
 
-- [3-minute recruiter demo](docs/DEMO_SCRIPT.md#3-minute-demo)
+- [3-minute overview](docs/DEMO_SCRIPT.md#3-minute-demo)
 - [10-minute technical walkthrough](docs/DEMO_SCRIPT.md#10-minute-demo)
 - [30-minute deep dive](docs/DEMO_SCRIPT.md#30-minute-demo)
 
@@ -426,7 +429,7 @@ Implemented:
 - Task cancel and retry
 - React Runtime Studio
 - RuntimeObject projection for Graph / Timeline / Inspector / Drawer
-- Dashboard, Knowledge, Memory, Evaluation, Workflow, and Settings pages for portfolio demonstration
+- Dashboard, Knowledge, Memory, Evaluation, Workflow, and Settings pages for demonstration
 
 Not implemented intentionally:
 
@@ -441,13 +444,13 @@ Not implemented intentionally:
 
 These are roadmap items, not fake UI claims.
 
-## Interview Narrative
+## What This Project Demonstrates
 
 This project demonstrates:
 
 - **Frontend ability**: React architecture, TypeScript, Zustand, SSE, design system, runtime workspace, graph, timeline, inspector, drawer, and interaction design.
 - **Agent ability**: Planner, workflow execution, tool runtime, RAG, memory, reflection, evaluation, trace, and runtime events.
 - **Backend ability**: task lifecycle, EventSource stream, Runtime Adapter, TaskManager, cancel/retry, and shared API contracts.
-- **Product judgment**: runtime-first IA, honest boundaries, demo flow, and documentation that can be explained in interviews.
+- **Product judgment**: runtime-first IA, honest boundaries, demo flow, and documentation that can be walked through out loud.
 
-The project is optimized for one outcome: helping a candidate explain and demonstrate AI Agent Platform engineering ability.
+This is a personal project, built to work Agent Runtime engineering through end to end in the open; scope boundaries are listed in [What Is Real Today](#what-is-real-today).

@@ -2,14 +2,16 @@
   "name": "agent-runtime-platform",
   "version": "1.0.0",
   "private": true,
-  "description": "Agent Studio is a portfolio-grade AI Agent Runtime Studio for interviews and GitHub demos.",
+  "description": "Agent Studio - an AI Agent Runtime console: planning, tool calling, retrieval, reflection and evaluation as an observable event stream (React + Node.js + SSE).",
   "main": "index.js",
   "keywords": [
     "ai",
     "agent",
     "runtime",
-    "studio",
-    "portfolio"
+    "sse",
+    "react",
+    "typescript",
+    "zustand"
   ],
   "workspaces": [
     "apps/*",
@@ -23,7 +25,7 @@
     "lint": "npm --prefix apps/agent-console run lint",
     "test": "tsx packages/agent-runtime/src/tool/security/reliability-test.ts && tsx apps/runtime-server/src/health-test.ts && npm --prefix apps/agent-console run test"
   },
-  "author": "",
+  "author": "novedu",
   "license": "MIT",
   "type": "commonjs",
   "engines": {

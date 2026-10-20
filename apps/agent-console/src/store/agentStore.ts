@@ -1,4 +1,5 @@
 import { create, type StoreApi } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
   AgentEvent,
   AgentEventType,
@@ -46,9 +47,16 @@ interface AgentState {
   setMemory: (memory: MemoryRecord[]) => void;
   setState: (state: AgentStateSnapshot) => void;
   setStatus: (status: AgentState['status']) => void;
+  /** Human readable failure shown above the composer. */
+  lastError?: string;
+  setLastError: (message?: string) => void;
+  /** Clears the visible transcript and starts a fresh conversation. */
+  startNewConversation: () => void;
 }
 
-export const useAgentStore = create<AgentState>((set, get) => ({
+export const useAgentStore = create<AgentState>()(
+  persist(
+    (set, get) => ({
   messages: [],
   events: [],
   plan: null,
@@ -60,6 +68,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   status: 'idle',
   isStreaming: false,
   answerBuffer: '',
+  lastError: undefined,
 
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
   updateMessage: (id, patch) =>
@@ -89,6 +98,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       isStreaming: false,
       activeAssistantMessageId: undefined,
       answerBuffer: '',
+      lastError: undefined,
     }),
 
   ensureConversationId: () => {
@@ -145,7 +155,25 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   setMemory: (memory) => set({ memory, memories: memory }),
   setState: (agentState) => set({ state: agentState }),
   setStatus: (status) => set({ status, isStreaming: status === 'running' }),
-}));
+  setLastError: (message) => set({ lastError: message }),
+
+  startNewConversation: () => {
+    get().reset();
+    set({ messages: [], conversationId: undefined, status: 'idle', isStreaming: false });
+  },
+    }),
+    {
+      name: 'agent-studio:session',
+      storage: createJSONStorage(() => localStorage),
+      // Only the transcript and the conversation id survive a reload; runtime
+      // state (events, plan, tools) is rebuilt per task.
+      partialize: (state) => ({
+        messages: state.messages,
+        conversationId: state.conversationId,
+      }),
+    },
+  ),
+);
 
 type StoreSet = StoreApi<AgentState>['setState'];
 type StoreGet = StoreApi<AgentState>['getState'];
@@ -277,7 +305,10 @@ function applyFinalAnswer(set: StoreSet, get: StoreGet, payload: Record<string, 
   }
 
   if (payload.done === true) {
-    set({ status: 'success', isStreaming: false });
+    // The answer is complete, but the task is not: evaluation and task_complete
+    // still follow. Declaring success here made the UI show "success" while the
+    // graph was still replaying earlier events, so only the composer is unlocked.
+    set({ isStreaming: false });
   }
 }
 

@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useState, type ReactNode } from 'react';
 import type { ConsoleMessage } from '../../types/agent';
 import { AgentIcon, Badge, Button, CopyIcon } from '../ui';
@@ -73,8 +74,12 @@ export function MessageItem({
           </p>
         ) : (
           <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
             className={classNames(
-              'prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-pre:rounded-lg prose-pre:bg-slate-950 prose-pre:text-slate-100',
+              'prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0',
+              'prose-headings:mb-2 prose-headings:mt-3 prose-headings:font-semibold prose-h1:text-base prose-h2:text-sm prose-h3:text-sm',
+              'prose-table:my-2 prose-table:w-full prose-table:border-collapse prose-th:border prose-th:border-line prose-th:bg-panel prose-th:px-2 prose-th:py-1 prose-th:text-left prose-td:border prose-td:border-line prose-td:px-2 prose-td:py-1',
+              'prose-pre:my-2 prose-pre:rounded-lg prose-pre:bg-slate-950 prose-pre:text-slate-100 prose-code:text-[12px]',
               isUser ? 'prose-invert' : '',
             )}
             components={{

@@ -102,6 +102,12 @@ export function AgentConsole() {
     };
   }, []);
 
+  function handleNewConversation() {
+    useAgentStore.getState().startNewConversation();
+  }
+
+  const lastError = useAgentStore((state) => state.lastError);
+
   const focusedObjectType = focusedRuntimeObject?.type;
   const focusedObjectId = focusedRuntimeObject?.id;
   const activeNodeId = focusedNodeId ?? currentNodeId;
@@ -297,6 +303,10 @@ export function AgentConsole() {
               runtimeOverview={runtimeOverview}
               runtimeObjects={runtimeObjects}
               runtimeProvider={runtimeProvider}
+              onNewConversation={handleNewConversation}
+              errorMessage={lastError}
+              onRetry={latestUserMessage ? () => runServerTask(latestUserMessage.content) : undefined}
+              onDismissError={() => useAgentStore.getState().setLastError(undefined)}
             />
           </div>
 

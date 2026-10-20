@@ -24,6 +24,10 @@ interface ChatPanelProps {
   runtimeObjects: RuntimeObject[];
   /** Provider reported by the server health check, e.g. "mock" or "openai". */
   runtimeProvider?: string;
+  onNewConversation?: () => void;
+  errorMessage?: string;
+  onRetry?: () => void;
+  onDismissError?: () => void;
 }
 
 export function ChatPanel({
@@ -43,6 +47,10 @@ export function ChatPanel({
   runtimeOverview,
   runtimeObjects,
   runtimeProvider,
+  onNewConversation,
+  errorMessage,
+  onRetry,
+  onDismissError,
 }: ChatPanelProps) {
   const messageViewportRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -75,9 +83,21 @@ export function ChatPanel({
             <h2 className="truncate text-sm font-semibold leading-4 text-ink">Chat Workspace</h2>
           </div>
         </div>
-        <Badge tone={isStreaming ? 'info' : 'neutral'} className="px-1.5 py-0.5 text-[10px]">
-          {isStreaming ? 'Streaming' : 'Ready'}
-        </Badge>
+        <div className="flex items-center gap-1.5">
+          {messages.length > 0 && onNewConversation ? (
+            <button
+              type="button"
+              onClick={onNewConversation}
+              title="Clear the transcript and start a new conversation"
+              className="inline-flex h-5 cursor-pointer items-center rounded-md border border-line bg-white px-1.5 text-[10px] font-semibold text-muted transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50 hover:text-accent"
+            >
+              New
+            </button>
+          ) : null}
+          <Badge tone={isStreaming ? 'info' : 'neutral'} className="px-1.5 py-0.5 text-[10px]">
+            {isStreaming ? 'Streaming' : 'Ready'}
+          </Badge>
+        </div>
       </header>
 
       {/* Status chips - compact row */}
@@ -137,6 +157,32 @@ export function ChatPanel({
 
       {/* Input box - always at bottom */}
       <div className="shrink-0">
+        {errorMessage ? (
+          <div className="mx-3 mb-1 flex items-start justify-between gap-2 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5">
+            <p className="text-[11px] leading-4 text-rose-700">{errorMessage}</p>
+            <div className="flex shrink-0 items-center gap-1">
+              {onRetry ? (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="inline-flex h-5 cursor-pointer items-center rounded border border-rose-300 bg-white px-1.5 text-[10px] font-semibold text-rose-700 transition-colors duration-200 hover:bg-rose-100"
+                >
+                  重试
+                </button>
+              ) : null}
+              {onDismissError ? (
+                <button
+                  type="button"
+                  onClick={onDismissError}
+                  aria-label="Dismiss error"
+                  className="inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded text-rose-500 transition-colors duration-200 hover:bg-rose-100"
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <InputBox
           disabled={isStreaming}
           onSubmit={onSubmit}

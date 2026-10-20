@@ -18,6 +18,7 @@ export function useAgentStream() {
   const beginTask = useAgentStore((state) => state.beginTask);
   const updateFromEvent = useAgentStore((state) => state.updateFromEvent);
   const setStatus = useAgentStore((state) => state.setStatus);
+  const setLastError = useAgentStore((state) => state.setLastError);
 
   const clearQueuedEvents = useCallback(() => {
     eventQueueRef.current = [];
@@ -59,6 +60,7 @@ export function useAgentStream() {
       subscriptionRef.current = null;
       taskIdRef.current = null;
       clearQueuedEvents();
+      setLastError(undefined);
       beginTask(input);
 
       try {
@@ -69,6 +71,7 @@ export function useAgentStream() {
           onEvent: dispatchEvent,
           onError: () => {
             setStatus('error');
+            setLastError('与运行时服务的连接中断了。确认 Agent Server 还在运行，然后重试。');
             writeActiveAssistantMessage('Runtime server connection lost. Check the Agent Server and rerun the demo task.');
           },
           onClose: () => {
@@ -78,10 +81,11 @@ export function useAgentStream() {
         });
       } catch {
         setStatus('error');
+        setLastError('无法创建任务：运行时服务可能没有启动。先运行 `npm run server`，再重试。');
         writeActiveAssistantMessage('Unable to start the Agent Server task. Start the runtime server, then run the demo again.');
       }
     },
-    [beginTask, clearQueuedEvents, dispatchEvent, setStatus],
+    [beginTask, clearQueuedEvents, dispatchEvent, setLastError, setStatus],
   );
 
   const stop = useCallback(() => {

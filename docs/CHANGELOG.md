@@ -2,6 +2,14 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Chat polish: persistence, markdown, input
+
+- The transcript and `conversationId` persist to `localStorage`; a `New` button in the chat header clears both.
+- Markdown now renders GFM (tables, task lists, autolinks) and the Tailwind typography plugin is enabled — the `prose` classes were previously a no-op, so headings and lists had no styling at all.
+- `Enter` sends, `Shift+Enter` inserts a newline, and IME composition is respected so Chinese candidate selection does not submit mid-word. The textarea autosizes up to 120px.
+- Failures surface a readable banner above the composer with a retry action instead of silently flipping the status.
+- The store no longer reports `success` when the final answer finishes; `task_complete` owns that transition, so the UI cannot show "success" while earlier events are still replaying.
+
 ## Unreleased - Multi-turn conversations
 
 - The client now owns a `conversationId` and sends it with every task, so a follow-up message continues the previous conversation instead of starting a new one.

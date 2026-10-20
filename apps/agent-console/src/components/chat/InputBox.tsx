@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState, type KeyboardEvent } from 'react';
 import { PlayIcon, StopIcon } from '@console/components/ui';
 import { getRuntimeModelLabel } from '../../features/agent-console/runtime-overview';
 
@@ -13,13 +13,35 @@ interface InputBoxProps {
 
 export function InputBox({ disabled, onSubmit, onStop, onRegenerate, runtimeProvider }: InputBoxProps) {
   const [value, setValue] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function submit() {
     const nextValue = value.trim();
     if (!nextValue || disabled) return;
     onSubmit(nextValue);
     setValue('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    submit();
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter sends, Shift+Enter breaks the line. `isComposing` keeps Chinese IME
+    // candidate selection from submitting the message mid-word.
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    submit();
+  }
+
+  function handleChange(next: string) {
+    setValue(next);
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
   }
 
   return (
@@ -27,12 +49,14 @@ export function InputBox({ disabled, onSubmit, onStop, onRegenerate, runtimeProv
       <div className="px-3 pt-2 pb-1.5">
         <div className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 py-1.5 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10">
           <textarea
+            ref={textareaRef}
             value={value}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => handleChange(event.target.value)}
+            onKeyDown={handleKeyDown}
             disabled={disabled}
             rows={1}
-            placeholder="Ask the agent anything..."
-            className="min-h-5 max-h-20 flex-1 resize-none bg-transparent text-xs outline-none placeholder:text-muted"
+            placeholder="Ask the agent anything...  (Enter 发送 / Shift+Enter 换行)"
+            className="min-h-5 max-h-[120px] flex-1 resize-none bg-transparent text-xs outline-none placeholder:text-muted"
           />
           {disabled ? (
             <button

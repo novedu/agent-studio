@@ -2,6 +2,11 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Pinned telemetry
+
+- The telemetry chart now sits above the inspector body instead of inside the empty state, so it stays visible after a task starts and an object gets selected.
+- Added a regression assertion: the chart must render in the object-inspection view as well.
+
 ## Unreleased - Inspector density pass
 
 - The default inspector is now three blocks: headline numbers (step / progress / eval), the telemetry chart, and two collapsed sections.

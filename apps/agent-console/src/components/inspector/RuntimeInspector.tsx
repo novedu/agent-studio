@@ -63,6 +63,18 @@ export function RuntimeInspector({
         </Badge>
       </header>
 
+      <section className="shrink-0 border-b border-line bg-white px-3 pb-2 pt-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Runtime Telemetry
+          </span>
+          <span className="text-[9px] text-muted">last 60s</span>
+        </div>
+        <Suspense fallback={<div className="mt-1 h-16 w-full animate-pulse rounded bg-slate-100" />}>
+          <EventRateChart compact />
+        </Suspense>
+      </section>
+
       <motion.div
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         initial={{ opacity: 0 }}
@@ -519,18 +531,6 @@ function EmptyInspector({
         <p className="mt-2 text-[10px] leading-4 text-muted">
           Select a graph node or timeline span to inspect the runtime object behind it.
         </p>
-      </section>
-
-      <section className="border-b border-line bg-white p-3">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
-            Runtime Telemetry
-          </span>
-          <span className="text-[9px] text-muted">last 60s</span>
-        </div>
-        <Suspense fallback={<div className="h-24 w-full animate-pulse rounded bg-slate-100" />}>
-          <EventRateChart />
-        </Suspense>
       </section>
 
       <div className="p-3">

@@ -65,7 +65,7 @@ function buildBaseOption(): EChartsCoreOption {
   };
 }
 
-export function EventRateChart() {
+export function EventRateChart({ compact = false }: { compact?: boolean } = {}) {
   const { samples, total, latest } = useEventRate(WINDOW_SECONDS);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ChartInstance | null>(null);
@@ -125,13 +125,15 @@ export function EventRateChart() {
       </div>
       <div
         ref={containerRef}
-        className="mt-1 h-24 w-full"
+        className={compact ? 'mt-1 h-16 w-full' : 'mt-1 h-24 w-full'}
         role="img"
         aria-label={`Runtime event rate over the last ${WINDOW_SECONDS} seconds`}
       />
-      <div className="mt-1 text-[9px] leading-4 text-muted">
-        Window {WINDOW_SECONDS}s · capped ring buffer · frame-gated paint
-      </div>
+      {compact ? null : (
+        <div className="mt-1 text-[9px] leading-4 text-muted">
+          Window {WINDOW_SECONDS}s · capped ring buffer · frame-gated paint
+        </div>
+      )}
     </div>
   );
 }

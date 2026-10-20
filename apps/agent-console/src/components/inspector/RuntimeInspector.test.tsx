@@ -74,6 +74,8 @@ describe('RuntimeInspector', () => {
     const html = container.textContent ?? '';
 
     expect(html).toContain('Runtime Inspector');
+    // Telemetry is pinned above the body, so it must survive object selection.
+    expect(html).toContain('Runtime Telemetry');
     expect(html).toContain('querySalesData');
     expect(html).toContain('Arguments');
     expect(html).toContain('Dependency Context');

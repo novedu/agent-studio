@@ -2,6 +2,7 @@ import { createServer as createNodeServer, type IncomingMessage, type Server, ty
 import { URL } from 'node:url';
 import type { AgentServerApp } from './app';
 import { createEventStream, sseHeaders } from './sse/event-stream';
+import { hasRealLLMProvider } from './runtime/agent-runtime-adapter';
 import type { ApiErrorResponse, CreateAgentTaskRequest } from '@shared-types/api';
 
 export interface CreateHttpServerOptions {
@@ -34,7 +35,7 @@ async function handleRequest(app: AgentServerApp, req: IncomingMessage, res: Ser
   }
 
   if (method === 'GET' && pathname === '/health') {
-    sendJson(res, 200, { status: 'ok' });
+    sendJson(res, 200, { status: 'ok', provider: hasRealLLMProvider() ? 'openai' : 'mock' });
     return;
   }
 

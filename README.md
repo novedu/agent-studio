@@ -228,6 +228,8 @@ docs/
 
 ## Quick Start
 
+> 未配置 `OPENAI_API_KEY` 时服务端运行在 **Mock 模式**：界面底部会显示 `Mock` 标记，回答来自本地模板而不是模型调用。想看完整脚本化链路，请提问「分析华东区域销售下降原因，并生成报告」。
+
 Install dependencies:
 
 ```bash

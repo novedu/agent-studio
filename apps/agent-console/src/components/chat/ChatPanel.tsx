@@ -22,6 +22,8 @@ interface ChatPanelProps {
   onStartRetryDemo?: () => void;
   runtimeOverview: RuntimeOverview;
   runtimeObjects: RuntimeObject[];
+  /** Provider reported by the server health check, e.g. "mock" or "openai". */
+  runtimeProvider?: string;
 }
 
 export function ChatPanel({
@@ -40,6 +42,7 @@ export function ChatPanel({
   onStartRetryDemo,
   runtimeOverview,
   runtimeObjects,
+  runtimeProvider,
 }: ChatPanelProps) {
   const messageViewportRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -139,6 +142,7 @@ export function ChatPanel({
           onSubmit={onSubmit}
           onStop={onStop}
           onRegenerate={onRegenerate}
+          runtimeProvider={runtimeProvider}
         />
       </div>
     </section>

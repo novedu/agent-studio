@@ -2,6 +2,13 @@
 
 All notable Agent Studio changes will be documented here.
 
+## Unreleased - Mock mode that does not look broken
+
+- `MockLLMProvider` is now input-aware instead of draining a fixed queue: greeting, capability questions, the scripted sales walkthrough, and everything else each get their own locally rendered answer.
+- Removed the `No more responses.` dead end. A retry of the scripted demo reuses the last answer instead of returning an empty one.
+- `/health` now reports the active provider (`mock` / `openai`), and the console shows a `Mock` badge in the composer footer so the state is visible instead of implied.
+- Added `mock-llm-provider-test.ts` (intent routing, planner JSON, retry exhaustion, echoed input) to the root `npm test` chain.
+
 ## Unreleased - Fresh media and honest durations
 
 - Replaced all seven README screenshots with captures of the current UI (dock tabs, telemetry chart, collapsed inspector sections).

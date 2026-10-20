@@ -448,10 +448,15 @@ function createKnowledgeBase(): KnowledgeBase {
   return knowledgeBase;
 }
 
+export function hasRealLLMProvider(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY);
+}
+
 function createDefaultLLMProvider(): LLMProvider {
-  if (process.env.OPENAI_API_KEY) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (apiKey) {
     return new OpenAIProvider({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey,
       baseURL: process.env.OPENAI_BASE_URL,
       model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
     });

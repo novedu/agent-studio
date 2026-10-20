@@ -7,6 +7,8 @@ export interface CreateAgentTaskResponse {
 
 export interface AgentHealthResponse {
   status: string;
+  /** Which LLM provider the server is actually using. */
+  provider?: string;
 }
 
 export type AgentTaskStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';

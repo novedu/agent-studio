@@ -25,7 +25,10 @@ async function main(): Promise<void> {
     assert.ok(address && typeof address === 'object');
     const response = await fetch(`http://127.0.0.1:${address.port}/health`);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { status: 'ok' });
+    const body = (await response.json()) as { status: string; provider?: string };
+    assert.equal(body.status, 'ok');
+    // The console shows a "Mock" badge when no model key is configured.
+    assert.ok(body.provider === 'mock' || body.provider === 'openai');
     console.log('Runtime server health check passed.');
   } finally {
     await new Promise<void>((resolve, reject) => {

@@ -7,9 +7,11 @@ interface InputBoxProps {
   onSubmit: (value: string) => void;
   onStop?: () => void;
   onRegenerate?: () => void;
+  /** Provider reported by the server health check, e.g. "mock" or "openai". */
+  runtimeProvider?: string;
 }
 
-export function InputBox({ disabled, onSubmit, onStop, onRegenerate }: InputBoxProps) {
+export function InputBox({ disabled, onSubmit, onStop, onRegenerate, runtimeProvider }: InputBoxProps) {
   const [value, setValue] = useState('');
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -68,6 +70,14 @@ export function InputBox({ disabled, onSubmit, onStop, onRegenerate }: InputBoxP
         <div className="flex items-center gap-1.5 text-[9px] text-muted">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           <span>Real SSE runtime</span>
+          {runtimeProvider === 'mock' ? (
+            <span
+              title="No model API key configured - answers are rendered from local templates"
+              className="rounded bg-amber-100 px-1 py-0.5 text-[8px] font-semibold uppercase tracking-[0.08em] text-amber-700"
+            >
+              Mock
+            </span>
+          ) : null}
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[9px] text-muted">Model</span>

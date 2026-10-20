@@ -23,7 +23,7 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && npm --prefix apps/agent-console run build",
     "lint": "npm --prefix apps/agent-console run lint",
-    "test": "tsx packages/agent-runtime/src/tool/security/reliability-test.ts && tsx apps/runtime-server/src/health-test.ts && npm --prefix apps/agent-console run test"
+    "test": "tsx packages/agent-runtime/src/llm/mock-llm-provider-test.ts && tsx packages/agent-runtime/src/tool/security/reliability-test.ts && tsx apps/runtime-server/src/health-test.ts && npm --prefix apps/agent-console run test"
   },
   "author": "novedu",
   "license": "MIT",

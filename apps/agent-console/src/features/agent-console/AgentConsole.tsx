@@ -18,6 +18,7 @@ import {
 import type { AgentEvent, CitationRecord, MemoryRecord } from '../../types/agent';
 import { RuntimeInspector } from '../../components/inspector';
 import { useAgentStream } from '../../hooks/useAgentStream';
+import { checkAgentServerHealth } from '../../services/agent';
 import { useAgentStore } from '../../store/agentStore';
 import { buildRuntimeOverview, type RuntimeOverview } from './runtime-overview';
 import {
@@ -85,7 +86,22 @@ export function AgentConsole() {
   const [highlightedTraceId, setHighlightedTraceId] = useState<string>();
   const [runtimeDockExpanded, setRuntimeDockExpanded] = useState(false);
   const [dockView, setDockView] = useState<DockView>('graph');
+  const [runtimeProvider, setRuntimeProvider] = useState<string | undefined>(undefined);
   const [runtimeDockManuallyToggled, setRuntimeDockManuallyToggled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    checkAgentServerHealth()
+      .then((health) => {
+        if (active) setRuntimeProvider(health.provider);
+      })
+      .catch(() => {
+        if (active) setRuntimeProvider(undefined);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const focusedObjectType = focusedRuntimeObject?.type;
   const focusedObjectId = focusedRuntimeObject?.id;
   const activeNodeId = focusedNodeId ?? currentNodeId;
@@ -280,6 +296,7 @@ export function AgentConsole() {
               onStartRetryDemo={runRetryDemo}
               runtimeOverview={runtimeOverview}
               runtimeObjects={runtimeObjects}
+              runtimeProvider={runtimeProvider}
             />
           </div>
 

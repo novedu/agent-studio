@@ -1,23 +1,9 @@
-# Agent Studio Documentation
+# 文档
 
-This directory contains the project documentation. The root [README](../README.md) is the public entry point; these documents explain the product and implementation decisions behind the demo.
-
-## Core Documents
-
-| Document | Purpose |
-| --- | --- |
-| [PRODUCT.md](PRODUCT.md) | Product positioning, target users, information architecture, and screen blueprint. |
-| [DESIGN.md](DESIGN.md) | High-level visual direction and Runtime Workspace principles. |
-| [UX.md](UX.md) | Navigation, interaction, state transitions, and evidence flows. |
-| [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) | Design tokens and reusable component rules. |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System boundaries, data flow, SSE, and frontend projection. |
-| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | Recording and walkthrough scripts for the Runtime demo. |
-| [PERFORMANCE.md](PERFORMANCE.md) | Telemetry cost, chart code-splitting, and benchmark reproduction. |
-| [CHANGELOG.md](CHANGELOG.md) | Product and implementation history. |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Development process, code boundaries, and verification commands. |
-
-## Technical Notes
-
-- [RuntimeObject model](architecture/runtime-object.md): frontend projection used by Graph, Timeline, Inspector, Drawer, Chat, and Evidence.
-- [Screenshots](screenshots/README.md): the frames used by the GitHub project page.
-- [Demo recording](media/agent-studio-demo.gif): a real capture of one demo run, from idle to finished task.
+- [Architecture](ARCHITECTURE.md)：三层结构、事件流、Run / Step / Attempt、数据存储。
+- [Demo](DEMO.md)：三分钟演示脚本。
+- [Contributing](CONTRIBUTING.md)：本地运行、常用命令、改动约定。
+- [Performance](PERFORMANCE.md)：图表按帧绘制、首屏包、基准数据。
+- [Changelog](CHANGELOG.md)：最近的改动。
+- [Runtime Object](architecture/runtime-object.md)：前端投影的字段和依赖规则。
+- [Screenshots](screenshots/README.md)：当前界面的截图。

@@ -1,85 +1,76 @@
-# Performance Notes
+# 性能笔记
 
-The runtime console streams events over SSE while the UI keeps four views in sync. Two costs matter:
+控制台通过 SSE 收事件，同时更新几个视图。这里只记两个成本：事件速率的计算，和首屏包大小。
 
-1. **Per-frame work** — anything computed on every frame must not grow with the session length.
-2. **First load** — a runtime debugger should not ship a charting library before the first paint.
+## 图表按帧绘制
 
-Both are addressed in the telemetry panel (`apps/agent-console/src/features/metrics/`).
+每个 SSE 事件都会更新 store，但图表不跟着每个事件重绘。图表只订阅一次，把新事件喂给累加器，最多每帧画一次，实际再合并到 250ms。
 
-## 1. Frame-gated painting
-
-Every SSE event updates the store immediately, but the chart does **not** react to events. The panel subscribes once, feeds an incremental accumulator, and paints at most once per animation frame (further coalesced to 250 ms):
-
-| Concern | Naive approach | This implementation |
+| 项目 | 朴素做法 | 现在的做法 |
 | --- | --- | --- |
-| Events → chart | one chart update per event | one store subscription, ingest only new events |
-| React renders | one render per event (1k events → 1k renders) | at most one render per animation frame |
-| Tab in background | keeps painting | `document.hidden` check skips the paint |
+| 事件到图表 | 每个事件更新一次 | 一个订阅，只处理新事件 |
+| React 渲染 | 每个事件一次 | 每帧最多一次 |
+| 后台标签页 | 继续画 | `document.hidden` 时跳过 |
 
-## 2. Capped ring buffer instead of an append-only array
+## 固定窗口
 
-`EventRateMeter` keeps a fixed number of one-second buckets (60 by default) in typed arrays. Memory and per-frame cost are bounded by the window, not by the number of events seen.
+`EventRateMeter` 只保留 60 个一秒桶，用 typed array 存。内存和每帧成本与窗口大小有关，与事件总数无关。
 
-Clicking `Run full demo` a hundred times no longer grows the chart's memory footprint.
+## 基准
 
-## 3. Measured: incremental accumulator vs full scan
+```bash
+npx tsx scripts/bench-event-rate.ts
+```
 
-`npx tsx scripts/bench-event-rate.ts` (Node 24, macOS, 60 frames, 60 s window):
+Node 24，macOS，60 帧，60 秒窗口：
 
 ```text
 events=10000 window=60s frames=60
 
-naive: 60 frames x full scan                   10.91 ms
-meter: ingest 10000 events once                 0.89 ms
-meter: 60 frame snapshots                       0.36 ms
+naive: 60 frames x full scan        10.91 ms
+meter: ingest 10000 events once      0.89 ms
+meter: 60 frame snapshots            0.36 ms
 
 per frame: naive 0.18 ms | meter 0.02 ms
-speedup: 8.7x | total counted: 10000
-
-scaling (per frame, 60s window):
-  events   naive(ms)   meter(ms)   speedup
-   10000       0.114       0.003     40.2x
-   50000       0.161       0.013     12.9x
-  100000       0.815       0.047     17.4x
+speedup: 8.7x
 ```
 
-Reading the numbers honestly:
-
-- At 10k events both paths are fast; the absolute cost is not the argument.
-- The argument is the **growth rate**: the naive scan is linear in the event count, the meter's per-frame cost is ~flat because it only touches the window.
-- Speedup ratios in the table are noisy (JIT warm-up, cache effects). Treat the per-frame columns as the signal, not the ratio.
-
-## 4. Measured: first-load bundle
-
-The chart needs ECharts. Importing it eagerly pushed the console chunk to **699 kB (226 kB gzip)** and triggered Vite's chunk-size warning. The chart is now a lazy chunk:
-
-| Build | Console chunk | Chart chunk | Gzip total on first paint |
-| --- | ---: | ---: | ---: |
-| Eager import | 699.31 kB | — | 226.33 kB |
-| Lazy chunk (current) | **200.27 kB** | 498.83 kB (on demand) | **56.27 kB** |
-
-The chart bundle only downloads when the inspector panel mounts, and `echarts/core` is used with explicit `use([...])` registration so only the line series, grid, tooltip and canvas renderer are included.
-
-## 5. What a real demo run produces
-
-Measured against the local runtime server (one `POST /api/agent/tasks` with the default demo prompt):
+不同事件量下的每帧成本：
 
 ```text
-80 events in 640 ms across 13 event types
-(final_answer x52, state_update x13, tool_start x3, tool_success x3, plan/rag/memory/reflection/evaluation x1 each)
+events   naive(ms)   meter(ms)   speedup
+ 10000       0.114       0.003     40.2x
+ 50000       0.161       0.013     12.9x
+100000       0.815       0.047     17.4x
 ```
 
-That is roughly 125 events/second at peak. Rendering once per event would mean ~80 React renders and ~80 chart redraws for a single demo run — this is why painting is frame-gated rather than event-gated.
+这些数字主要看增长趋势：朴素做法随事件数线性增长，meter 只碰窗口，成本基本平。倍率受 JIT 和缓存影响，不用太当真。
 
-## 6. What is *not* measured here
+## 首屏包
 
-- **Browser frame rate.** The numbers above are computation cost, not FPS. FPS has to be read in a real browser (Performance panel), which is the honest way to claim it.
-- **SSE throughput on a real network.** Local events arrive far faster than over a network.
+图表用 ECharts。最早是同步引入，控制台 chunk 到了 699 kB（gzip 226 kB）。现在图表单独懒加载：
 
-Reproduce everything on this page with:
+| 构建 | 控制台 chunk | 图表 chunk | 首屏 gzip |
+| --- | ---: | ---: | ---: |
+| 同步引入 | 699.31 kB | 无 | 226.33 kB |
+| 懒加载（当前） | 200.27 kB | 498.83 kB（按需） | 56.27 kB |
 
-```bash
-npx tsx scripts/bench-event-rate.ts   # aggregation cost + scaling
-npm run build                          # bundle split
+图表只在 Inspector 挂载时下载。ECharts 用 `echarts/core`，只注册 line、grid、tooltip 和 canvas renderer。
+
+## 一次演示的量
+
+本地跑一次默认任务：
+
+```text
+80 events in 640 ms, 13 event types
+final_answer x52, state_update x13, tool_start x3, tool_success x3
+plan/rag/memory/reflection/evaluation x1 each
 ```
+
+大约 125 events/s。如果每个事件都渲染，一次演示要渲染 80 次 React 和 80 次图表，所以图表按帧画。
+
+## 没测的部分
+
+- 浏览器 FPS。上面是计算成本，不是帧率。
+- 真实网络下的 SSE 吞吐。本地事件比线上快很多。
+- 真实模型下的耗时和 token。

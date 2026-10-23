@@ -1,19 +1,12 @@
 # Runtime Object Model
 
-Runtime Object is the frontend projection layer for Agent Studio.
+The console projects runtime events and task state into one object. Chat, Graph, Timeline, Inspector, Drawer and Evidence all read from it.
 
-It does not change the Runtime, Server, API, SSE protocol, or Zustand store structure. It converts existing execution nodes and server events into a single debugger-friendly object model consumed by:
+It doesn't change the API, SSE format or Zustand store.
 
-- Chat Runtime Summary
-- Runtime Graph
-- Debug Timeline
-- Runtime Inspector
-- Step Drawer
-- Evidence navigation
+## Why
 
-## Goal
-
-Every visible runtime surface should describe the same selected object.
+Selecting a node in one view should update the others. Without a shared object, each panel would build its own version of the same run.
 
 ```text
 Selected Runtime Object
@@ -23,8 +16,6 @@ Selected Runtime Object
   -> Inspector sections
   -> Drawer tabs
 ```
-
-This prevents the workspace from becoming independent panels that each tell a different story.
 
 ## Schema
 
@@ -111,7 +102,7 @@ interface RuntimeSpan {
 }
 ```
 
-The span model lets the Timeline behave like a trace debugger rather than an event list.
+Timeline uses the span projection to group events by object.
 
 ## Dependency Rules
 
@@ -144,11 +135,11 @@ Evaluation
 
 These rules are a UI projection. They do not alter runtime execution.
 
-## Debugger Surfaces
+## Where it is used
 
 ### Chat
 
-Chat remains the primary product surface.
+Chat shows a short summary of the selected object.
 
 Assistant messages show runtime summary segments:
 
@@ -194,7 +185,7 @@ Drawer shows:
 - Metadata
 - Raw JSON
 
-## Non Goals
+## Out of scope
 
 RuntimeObject does not:
 

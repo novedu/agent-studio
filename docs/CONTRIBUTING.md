@@ -1,121 +1,78 @@
-# Contributing to Agent Studio
+# 开发说明
 
-## Development Flow
+这是个人项目，没有严格的贡献流程。下面的步骤能让你在本地跑起来，改完代码知道该跑哪些检查。
 
-Every meaningful version follows this process:
+## 环境
 
-```text
-Product Spec
-↓
-Information Architecture
-↓
-Wireframe
-↓
-High Fidelity Design
-↓
-Implementation Plan
-↓
-Coding
-↓
-Review
-↓
-Iteration
-```
-
-Do not jump directly from prompt to code for product-level changes.
-
-## Versioning
-
-Use product versions instead of endless sprint labels:
-
-```text
-Agent Studio 2.0
-Agent Studio 2.1
-Agent Studio 2.2
-Agent Studio 2.3
-Agent Studio 2.4
-Agent Studio 3.0
-```
-
-## Code Boundaries
-
-For Agent Studio 2.0 UI work, allowed paths are:
-
-```text
-apps/agent-console/src/**
-docs/**
-```
-
-Do not modify these without explicit scope approval:
-
-```text
-packages/agent-runtime
-apps/runtime-server
-API
-SSE
-TaskManager
-Memory
-Evaluation
-Planner
-Workflow
-Store business structure
-```
-
-## Documentation Source of Truth
-
-- `docs/PRODUCT.md` defines product positioning, target users, information architecture, screen blueprint, and product principles.
-- `docs/DESIGN.md` defines the high-level design philosophy.
-- `docs/UX.md` defines navigation, interaction, state flow, and runtime behavior.
-- `docs/DESIGN_SYSTEM.md` defines shared implementation standards for UI components and tokens.
-
-If code conflicts with the documentation, change the code. Do not casually change the documentation hierarchy.
-
-## Required Verification
-
-Before completing repo-level changes, prefer the root scripts:
+- Node.js 20+
+- npm 10+
 
 ```bash
-npm run lint
-npm run test
-npm run build
-```
-
-For console-only work, these local scripts are also available:
-
-```bash
-cd apps/agent-console
-npm run lint
-npm run test
-npm run build
-```
-
-For TypeScript-only checks:
-
-```bash
-npm run typecheck
-```
-
-For local full-stack development:
-
-```bash
+npm install
+cp .env.example .env   # 可选，不配 Key 就走 Mock
 npm run dev:all
 ```
 
-For the engineering quality milestone, tests must cover:
+`dev:all` 会同时起 Runtime Server 和 Vite。Vite 默认 5173，服务端默认 3001。端口被占用时看终端输出。
 
-- RuntimeObject lifecycle, span, parent, and dependency projection
-- Agent event projection into Knowledge, Memory, Timeline, and task state
-- Knowledge and Memory derived views
-- Runtime Inspector object-specific rendering
-- Runtime Server `/health`
+也可以分开起：
 
-## UI Review Checklist
+```bash
+npm run server
+npm --prefix apps/agent-console run dev
+```
 
-- Can the user understand what the agent is doing within 3 seconds?
-- Is Chat still the primary workspace surface?
-- Does the selected runtime object synchronize Graph, Timeline, Inspector, Drawer, and Evidence?
-- Are loading, empty, running, completed, failed states present?
-- Is there any admin-template styling left?
-- Is motion calm and consistent?
-- Are keyboard focus states visible?
-- Are scroll areas intentional?
+## 常用命令
+
+```bash
+npm run dev:all      # 前后端一起
+npm run server       # 只起服务端
+npm run lint         # 前端 ESLint
+npm run typecheck    # TypeScript
+npm test             # 密钥扫描 + 后端脚本 + 前端测试
+npm run build        # typecheck + 前端构建
+```
+
+改完代码至少跑一遍：
+
+```bash
+npm run lint && npm test && npm run build
+```
+
+## 代码位置
+
+```text
+apps/agent-console/     React 控制台
+apps/runtime-server/    HTTP、SSE、TaskManager
+packages/agent-runtime/ Planner、Workflow、Tool、RAG、Memory、Evaluation
+packages/shared-types/  前后端共享类型
+```
+
+前端的运行时投影在 `apps/agent-console/src/components/execution/execution-model.ts`，服务端的任务逻辑在 `apps/runtime-server/src/task/task-manager.ts`。
+
+## 改动的几个约定
+
+- 页面状态留在前端，不要把 tab、选中节点这类状态塞进服务端。
+- 任务状态和步骤状态以服务端快照为准，前端不要自己猜进度。
+- 新增事件时，先改 `packages/shared-types`，再改 runtime、服务端和前端投影，最后补测试。
+- 工具失败要保留原始参数和错误，不要只返回一句“执行失败”。
+- 不要提交 `.env`、`.data/`、日志和本地数据库文件。
+
+## 测试覆盖
+
+`npm test` 会跑：
+
+- 密钥扫描，防止 key 形状的字符串被提交。
+- 会话复用、隔离和历史截断。
+- Mock provider 的意图路由。
+- 权限、风险和执行器可靠性。
+- Runtime Server 健康检查。
+- 步骤重试、取消和事件顺序。
+- 任务/事件持久化和重启读取。
+- 前端 Runtime Object、Steps、失败面板、store 等。
+
+这些测试保证演示链路不崩，不覆盖真实网络、浏览器性能和真实模型质量。
+
+## 提交
+
+提交信息写清楚改了什么、为什么改。一个提交只做一件事。文档和代码一起改时，文档要跟得上当前实现，不要留过期截图或过期命令。

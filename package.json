@@ -2,7 +2,7 @@
   "name": "agent-runtime-platform",
   "version": "1.0.0",
   "private": true,
-  "description": "Agent Studio - an AI Agent Runtime console: planning, tool calling, retrieval, reflection and evaluation as an observable event stream (React + Node.js + SSE).",
+  "description": "A local console for running, debugging and replaying AI agent tasks.",
   "main": "index.js",
   "keywords": [
     "ai",

@@ -170,13 +170,13 @@ function RuntimeOverviewHeader({
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
-            Runtime Control Plane
+            Run History
           </div>
           <Badge tone={error ? 'danger' : 'success'}>{error ? 'Disconnected' : 'Connected'}</Badge>
         </div>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink">Runtime Overview</h1>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink">Runs</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Scan recent Agent runs, failures, and current-session signals before opening the debugger.
+          Review persisted runs, failures, and the current live session before opening a run.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted">
           <span>{getRuntimeEnvironmentLabel()}</span>

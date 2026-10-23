@@ -306,48 +306,38 @@ Default route:
 Primary navigation:
 
 ```text
-Agent Workspace
-Dashboard
-Knowledge
-Memory
-Evaluation
-Workflow
-Settings
+Agent Workspace   (live run)
+Runs              (persisted history → Run Detail)
 ```
 
-Navigation priority:
+Sidebar footer:
 
 ```text
-Agent Workspace
+About & limits
+Documentation
+```
 
-↓
+Run Detail tabs:
 
-Dashboard
-
-↓
-
-Knowledge
-
-↓
-
+```text
+Overview
+Evidence
 Memory
-
-↓
-
-Evaluation
-
-↓
-
-Workflow
-
-↓
-
-Settings
+Quality
+Events
 ```
 
 Agent Workspace is always the primary entry.
 
-Dashboard is an overview page, not the main experience.
+Runs is the history surface, not the main experience. Knowledge, Memory and
+Evaluation are run-scoped tabs now; the standalone routes are legacy deep links
+with a deprecation notice. Workflow redirects to Agent because it duplicated the
+plan and graph.
+
+> P1-2 update: the later "Knowledge / Memory / Evaluation / Workflow / Settings"
+> sections describe the legacy standalone pages. Their current home is the Run
+> Detail tabs (Evidence / Memory / Quality), and Settings is labelled
+> "About & Limits" in the sidebar footer.
 
 ---
 
@@ -370,21 +360,32 @@ Contains:
 
 ---
 
-## Dashboard
+## Runs
 
 Purpose:
 
-Runtime overview.
+Persisted run history and entry point to Run Detail.
 
 Contains:
 
-- Recent Tasks
-- Runtime Metrics
-- Recent Failures
-- Model Usage
-- Evaluation Summary
-- Average Latency
-- Cost Overview
+- Current Runtime spotlight (live session)
+- Recent Tasks (opens `/runs/:taskId`)
+- Failure Review
+- Total / completed / failed / running counts
+
+## Run Detail
+
+Purpose:
+
+Review one persisted run without the live console.
+
+Tabs:
+
+- Overview (goal, final answer, steps, attempts)
+- Evidence (RAG documents and scores)
+- Memory (working / episodic / semantic writes)
+- Quality (rule-based score, criteria, feedback)
+- Events (full event stream)
 
 ---
 

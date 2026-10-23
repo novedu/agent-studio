@@ -224,12 +224,11 @@ This is a real failure path: the task fails on the server, the console explains 
 
 Briefly show:
 
-- `/dashboard`: runtime overview
-- `/knowledge`: current-session RAG evidence
-- `/memory`: working / episodic / semantic memory
-- `/evaluation`: scorecard and feedback
-- `/workflow`: planner / workflow mapping
-- `/settings`: runtime boundary and readiness
+- `/runs`: persisted run history (all runs, failures, totals)
+- `/runs/:taskId`: Overview / Evidence / Memory / Quality / Events for one run
+- `/settings`: About & limits (runtime boundary and readiness)
+- Legacy `/knowledge`, `/memory`, `/evaluation`: old deep links with a migration notice
+- `/workflow`: redirects to `/agent` (it duplicated the plan/graph)
 
 Keep the message clear:
 

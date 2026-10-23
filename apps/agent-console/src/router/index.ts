@@ -12,11 +12,15 @@ export const router = createBrowserRouter([
         element: createElement(Navigate, { to: '/agent', replace: true }),
       },
       {
-        path: 'dashboard',
+        path: 'runs',
         lazy: async () => {
           const { Dashboard } = await import('../pages/Dashboard');
           return { Component: Dashboard };
         },
+      },
+      {
+        path: 'dashboard',
+        element: createElement(Navigate, { to: '/runs', replace: true }),
       },
       {
         path: 'agent',
@@ -34,12 +38,10 @@ export const router = createBrowserRouter([
       },
       {
         path: 'workflow',
-        lazy: async () => {
-          const { Workflow } = await import('../pages/Workflow');
-          return { Component: Workflow };
-        },
+        element: createElement(Navigate, { to: '/agent', replace: true }),
       },
       {
+        // Legacy session views: kept as deep links, no longer in the sidebar.
         path: 'knowledge',
         lazy: async () => {
           const { Knowledge } = await import('../pages/Knowledge');

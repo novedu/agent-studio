@@ -4,12 +4,7 @@ import {
   AgentIcon,
   BookIcon,
   DashboardIcon,
-  EvaluationIcon,
   HelpIcon,
-  KnowledgeIcon,
-  MemoryIcon,
-  SettingsIcon,
-  WorkflowIcon,
 } from '@console/components/ui';
 import { classNames } from '@console/components/ui/classNames';
 
@@ -17,16 +12,16 @@ interface NavItem {
   label: string;
   path: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
+  end?: boolean;
 }
 
+/**
+ * Two primary destinations. Knowledge / Memory / Quality now live inside a
+ * specific run (Run Detail tabs); Workflow duplicated the Agent graph.
+ */
 const navigation: NavItem[] = [
-  { label: 'Agent', path: '/agent', icon: AgentIcon },
-  { label: 'Dashboard', path: '/dashboard', icon: DashboardIcon },
-  { label: 'Knowledge', path: '/knowledge', icon: KnowledgeIcon },
-  { label: 'Memory', path: '/memory', icon: MemoryIcon },
-  { label: 'Evaluation', path: '/evaluation', icon: EvaluationIcon },
-  { label: 'Workflow', path: '/workflow', icon: WorkflowIcon },
-  { label: 'Settings', path: '/settings', icon: SettingsIcon },
+  { label: 'Agent', path: '/agent', icon: AgentIcon, end: true },
+  { label: 'Runs', path: '/runs', icon: DashboardIcon },
 ];
 
 export function Sidebar() {
@@ -41,7 +36,7 @@ export function Sidebar() {
         {navigation.map((item) => {
           const Icon = item.icon;
           return (
-            <NavLink key={item.path} to={item.path} end={item.path === '/agent'}>
+            <NavLink key={item.path} to={item.path} end={item.end}>
               {({ isActive }) => (
                 <div
                   className={classNames(
@@ -61,14 +56,27 @@ export function Sidebar() {
       </nav>
       <div className="border-t border-line px-2 py-3">
         <div className="space-y-1">
-          <button className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-panel hover:text-ink">
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              classNames(
+                'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors duration-150',
+                isActive ? 'bg-panel text-ink' : 'text-muted hover:bg-panel hover:text-ink',
+              )
+            }
+          >
+            <HelpIcon className="h-3.5 w-3.5" />
+            <span>About & limits</span>
+          </NavLink>
+          <a
+            href="https://github.com/novedu/agent-studio#readme"
+            target="_blank"
+            rel="noreferrer"
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-panel hover:text-ink"
+          >
             <BookIcon className="h-3.5 w-3.5" />
             <span>Documentation</span>
-          </button>
-          <button className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-panel hover:text-ink">
-            <HelpIcon className="h-3.5 w-3.5" />
-            <span>Help & Docs</span>
-          </button>
+          </a>
         </div>
         <div className="mt-3 rounded-lg border border-line bg-panel p-2.5">
           <div className="text-[11px] font-semibold text-ink">Agent Studio 2.0</div>

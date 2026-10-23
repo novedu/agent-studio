@@ -12,6 +12,7 @@ import {
 } from '@console/components/ui';
 import { classNames } from '@console/components/ui/classNames';
 import { useAgentStore } from '@console/store/agentStore';
+import { LegacySessionNotice } from '@console/components/legacy/LegacySessionNotice';
 import type { AgentEvent, CitationRecord } from '@console/types/agent';
 
 export interface KnowledgeChunk {
@@ -63,6 +64,8 @@ export function Knowledge() {
   return (
     <section className="h-full overflow-y-auto bg-[var(--studio-bg)]">
       <div className="mx-auto flex max-w-[1440px] flex-col gap-4 p-4 lg:p-6">
+        <LegacySessionNotice view="Knowledge evidence" />
+
         <KnowledgeHeader chunkCount={chunks.length} runCount={retrievalRuns.length} />
 
         {chunks.length === 0 ? (

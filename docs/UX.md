@@ -14,15 +14,15 @@ Default entry:
 
 Navigation priority:
 
-1. Agent Workspace
-2. Dashboard
-3. Knowledge
-4. Memory
-5. Evaluation
-6. Workflow
-7. Settings
+1. Agent Workspace (live task)
+2. Runs (persisted history → Run Detail)
 
-Workspace is the primary entry point because Agent Studio is runtime-first, not dashboard-first.
+Sidebar footer:
+
+- About & limits (`/settings`)
+- Documentation (GitHub README)
+
+Knowledge, Memory and Evaluation are no longer top-level destinations: they are tabs in a specific run (`/runs/:taskId` → Evidence / Memory / Quality). Workflow redirects to Agent because it duplicated the plan/graph. The legacy `/knowledge`, `/memory` and `/evaluation` deep links still render with a deprecation notice.
 
 ## Screen Blueprint
 
@@ -39,20 +39,18 @@ Contains:
 - Inspector
 - Evidence Navigation
 
-### Dashboard
+### Runs
 
-Purpose: runtime overview.
+Purpose: persisted run history and entry point to Run Detail.
 
 Contains:
 
-- Recent Tasks
-- Recent Failures
-- Average Evaluation
-- Runtime Metrics
-- Model Usage
-- Latest Memory
-- Recent Knowledge
-- Cost
+- Current Runtime spotlight (live session)
+- Recent Tasks (persisted, opens `/runs/:taskId`)
+- Failure Review (failed/cancelled runs)
+- Totals: total / completed / failed / running
+
+Model, token and cost figures are only shown when the runtime actually reports them; there is no invented usage data.
 - Latency
 
 ### Knowledge Center

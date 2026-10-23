@@ -254,11 +254,11 @@ function SettingsHeader({ serverUrl }: { serverUrl: string }) {
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
-            Enterprise Platform
+            Workspace Boundary
           </div>
           <Badge tone={serverUrl === 'not configured' ? 'danger' : 'info'}>readiness view</Badge>
         </div>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink">Settings</h1>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink">About & Limits</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
           Inspect runtime connection, environment configuration, SSE contract, and enterprise readiness boundaries.
         </p>

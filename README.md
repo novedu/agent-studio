@@ -43,7 +43,8 @@ The `/agent` page is the product center. Chat is the primary workspace. Graph ex
 - **Debug Timeline**: runtime events with component, status, duration, retry, token, metadata, input, and output.
 - **Professional Inspector**: object-driven panels for execution, input, output, reasoning, events, evidence, memory, evaluation, and logs.
 - **Demo path**: one-click happy-path task, plus a real tool failure you can fix and retry at the failed step.
-- **Persistent run history**: tasks and events survive a restart; Dashboard opens a read-only run detail with steps, attempts and the final answer.
+- **Run-scoped views**: Run Detail tabs for Overview / Evidence / Memory / Quality / Events; the sidebar only has Agent and Runs.
+- **Persistent run history**: tasks and events survive a restart; Runs opens a read-only run detail with steps, attempts and the final answer.
 - **Per-run model identity**: each task records the provider/model that served it; the header shows `Mock · 模板` or the real model name.
 
 ## Architecture
@@ -450,7 +451,7 @@ const llmProvider = realLLMProvider ?? mockLLMProvider
 
 - 任务快照写入 `AGENT_DATA_DIR`（默认 `.data/`）：`tasks.json` 保存任务、计划、步骤、attempts、trace；`events/<taskId>.jsonl` 保存完整事件流。`.data/` 已加入 `.gitignore`。
 - 任务创建时记录本次运行实际使用的 `provider` 与 `model`；`/health` 返回同样的身份信息，顶部 Model 显示 `Mock · 模板` 或 `DeepSeek · deepseek-chat`，不再显示 `Runtime configured` 占位。
-- `GET /api/agent/tasks/:taskId/history` 返回任务快照 + 完整事件；Dashboard 的任务行进入 `/runs/:taskId` 只读详情页（目标、最终答案、步骤与 attempts、事件流、provider/model）。
+- `GET /api/agent/tasks/:taskId/history` 返回任务快照 + 完整事件；Runs 的任务行进入 `/runs/:taskId` 只读详情页（目标、最终答案、步骤与 attempts、事件流、provider/model）。
 - 这是本地 JSON 快照，不是数据库：没有分页、搜索、清理策略，也没有把会话记忆持久化。服务重启后历史可查，但**步骤级重试**仍依赖内存里的原会话；重启后只能整任务重跑。
 
 ### 7 · Runtime 架构
@@ -498,7 +499,9 @@ Implemented:
 - Per-run provider/model recorded on the task
 - React Runtime Studio
 - RuntimeObject projection for Graph / Timeline / Inspector / Drawer
-- Dashboard, Knowledge, Memory, Evaluation, Workflow, and Settings pages for demonstration
+- Navigation converged to **Agent** and **Runs** (plus About & limits in the sidebar footer); run-scoped Evidence / Memory / Quality live in the Run Detail tabs
+- Legacy `/knowledge`, `/memory`, `/evaluation` deep links remain but show a deprecation notice; `/workflow` redirects to `/agent`
+- Legacy Knowledge/Memory/Evaluation pages and the Workflow page remain in the codebase but are no longer in the primary navigation
 
 Not implemented intentionally:
 

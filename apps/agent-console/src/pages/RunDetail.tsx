@@ -10,11 +10,34 @@ import {
 import type { AgentEvent } from '@console/types/agent';
 import type { TaskStepRecord } from '@shared-types/task';
 
+type RunTab = 'overview' | 'evidence' | 'memory' | 'quality' | 'events';
+
+interface EvidenceDoc {
+  id: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  score?: number;
+}
+
+interface MemoryItem {
+  id: string;
+  type?: string;
+  content: string;
+  importance: number;
+}
+
+interface EvaluationPayload {
+  score: number;
+  criteria?: Record<string, number>;
+  feedback?: string[];
+}
+
 export function RunDetail() {
   const { taskId } = useParams<{ taskId: string }>();
   const [data, setData] = useState<AgentTaskHistoryResponse>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<RunTab>('overview');
 
   useEffect(() => {
     let active = true;
@@ -26,6 +49,7 @@ export function RunDetail() {
 
     setLoading(true);
     setError(undefined);
+    setTab('overview');
     getAgentTaskHistory(taskId)
       .then((history) => {
         if (active) setData(history);
@@ -47,6 +71,9 @@ export function RunDetail() {
   const finalAnswer = useMemo(() => task?.trace?.finalAnswer ?? readFinalAnswer(events), [events, task]);
   const duration = task?.trace?.totalDuration ?? computeDuration(events);
   const steps = task?.steps ?? [];
+  const evidence = useMemo(() => readEvidence(events), [events]);
+  const memoryItems = useMemo(() => readMemory(events), [events]);
+  const evaluation = useMemo(() => readEvaluation(events), [events]);
 
   if (loading) {
     return (
@@ -64,7 +91,7 @@ export function RunDetail() {
           <p className="mt-2 text-xs leading-5 text-muted">
             {error ?? 'This run is not in the local history anymore.'}
           </p>
-          <Link to="/dashboard" className="mt-4 inline-block text-xs font-semibold text-blue-700 hover:underline">
+          <Link to="/runs" className="mt-4 inline-block text-xs font-semibold text-blue-700 hover:underline">
             Back to runs
           </Link>
         </Card>
@@ -79,13 +106,21 @@ export function RunDetail() {
         ? `${vendorLabel(task.provider)} · ${task.model}`
         : task.provider ?? 'unknown';
 
+  const tabs: Array<{ id: RunTab; label: string }> = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'evidence', label: `Evidence${evidence.length ? ` · ${evidence.length}` : ''}` },
+    { id: 'memory', label: `Memory${memoryItems.length ? ` · ${memoryItems.length}` : ''}` },
+    { id: 'quality', label: evaluation ? `Quality · ${Math.round(evaluation.score * 100)}` : 'Quality' },
+    { id: 'events', label: `Events · ${events.length}` },
+  ];
+
   return (
     <section className="h-full overflow-y-auto bg-[var(--studio-bg)]">
       <div className="mx-auto flex max-w-[1200px] flex-col gap-4 p-4 lg:p-6">
         <header className="border-b border-line pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <Link to="/dashboard" className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted hover:text-ink">
+              <Link to="/runs" className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted hover:text-ink">
                 ← Runs
               </Link>
               <h1 className="mt-1 truncate text-xl font-semibold tracking-tight text-ink">Run Detail</h1>
@@ -116,58 +151,35 @@ export function RunDetail() {
           ) : null}
         </Card>
 
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={
+                tab === item.id
+                  ? 'h-8 cursor-pointer rounded-lg border border-accent bg-blue-50 px-3 text-[11px] font-semibold text-accent'
+                  : 'h-8 cursor-pointer rounded-lg border border-line bg-white px-3 text-[11px] font-semibold text-muted transition-colors duration-200 hover:border-lineStrong hover:text-ink'
+              }
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="flex min-w-0 flex-col gap-4">
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-ink">Final answer</div>
-                <Badge tone={task.status === 'completed' ? 'success' : 'neutral'}>
-                  {task.status === 'completed' ? 'delivered' : 'not delivered'}
-                </Badge>
-              </div>
-              {finalAnswer ? (
-                <div className="prose prose-sm mt-3 max-w-none prose-headings:mb-2 prose-headings:mt-3 prose-headings:text-sm prose-li:my-0">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{finalAnswer}</ReactMarkdown>
-                </div>
-              ) : (
-                <p className="mt-3 text-xs text-muted">
-                  This run ended without a final answer. Check the failed step below.
-                </p>
-              )}
-            </Card>
-
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-ink">Steps & attempts</div>
-                <Badge>{steps.length} steps</Badge>
-              </div>
-              {steps.length === 0 ? (
-                <p className="mt-3 text-xs text-muted">No step records were persisted for this run.</p>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {steps.map((step) => (
-                    <StepCard key={step.id} step={step} />
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-ink">Event history</div>
-                <Badge>{events.length} events</Badge>
-              </div>
-              <p className="mt-1 text-[10px] text-muted">
-                Stored on the server as JSONL; answer deltas are collapsed and not listed one by one.
-              </p>
-              <div className="mt-3 space-y-1">
-                {events
-                  .filter((event) => !isAnswerDelta(event))
-                  .map((event) => (
-                    <EventRow key={event.id} event={event} />
-                  ))}
-              </div>
-            </Card>
+            {tab === 'overview' ? (
+              <>
+                <AnswerCard finalAnswer={finalAnswer} completed={task.status === 'completed'} />
+                <StepsCard steps={steps} />
+              </>
+            ) : null}
+            {tab === 'evidence' ? <EvidenceCard documents={evidence} /> : null}
+            {tab === 'memory' ? <MemoryCard items={memoryItems} /> : null}
+            {tab === 'quality' ? <QualityCard evaluation={evaluation} /> : null}
+            {tab === 'events' ? <EventsCard events={events} /> : null}
           </div>
 
           <aside className="flex min-w-0 flex-col gap-4">
@@ -181,6 +193,8 @@ export function RunDetail() {
                 <Row label="Duration" value={formatDuration(duration)} />
                 <Row label="Created" value={formatTime(task.createdAt)} />
                 <Row label="Events" value={String(events.length)} />
+                <Row label="Evidence" value={String(evidence.length)} />
+                <Row label="Memory" value={String(memoryItems.length)} />
               </dl>
             </Card>
 
@@ -195,6 +209,196 @@ export function RunDetail() {
         </div>
       </div>
     </section>
+  );
+}
+
+function AnswerCard({ finalAnswer, completed }: { finalAnswer?: string; completed: boolean }) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-ink">Final answer</div>
+        <Badge tone={completed ? 'success' : 'neutral'}>{completed ? 'delivered' : 'not delivered'}</Badge>
+      </div>
+      {finalAnswer ? (
+        <div className="prose prose-sm mt-3 max-w-none prose-headings:mb-2 prose-headings:mt-3 prose-headings:text-sm prose-li:my-0">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{finalAnswer}</ReactMarkdown>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-muted">
+          This run ended without a final answer. Check the failed step in Overview.
+        </p>
+      )}
+    </Card>
+  );
+}
+
+function StepsCard({ steps }: { steps: TaskStepRecord[] }) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-ink">Steps & attempts</div>
+        <Badge>{steps.length} steps</Badge>
+      </div>
+      {steps.length === 0 ? (
+        <p className="mt-3 text-xs text-muted">No step records were persisted for this run.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {steps.map((step) => (
+            <StepCard key={step.id} step={step} />
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function EvidenceCard({ documents }: { documents: EvidenceDoc[] }) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-ink">Evidence</div>
+        <Badge tone={documents.length ? 'warning' : 'neutral'}>{documents.length} chunks</Badge>
+      </div>
+      {documents.length === 0 ? (
+        <p className="mt-3 text-xs text-muted">No retrieval evidence was recorded for this run.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {documents.map((document, index) => (
+            <div key={`${document.id}-${index}`} className="rounded-lg border border-line bg-white p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-semibold text-ink">{documentTitle(document)}</div>
+                  <div className="mt-0.5 font-mono text-[10px] text-muted">
+                    {document.id}
+                    {document.score !== undefined ? ` · score ${document.score}` : ''}
+                  </div>
+                </div>
+                <Badge tone="neutral">retrieved</Badge>
+              </div>
+              <p className="mt-2 text-[11px] leading-5 text-slate-600">{document.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function MemoryCard({ items }: { items: MemoryItem[] }) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-ink">Memory writes</div>
+        <Badge tone={items.length ? 'info' : 'neutral'}>{items.length} items</Badge>
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-3 text-xs text-muted">
+          No memory update was recorded. Failed runs skip the post-run memory write.
+        </p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {items.map((item) => (
+            <div key={item.id} className="rounded-lg border border-line bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Badge tone={memoryTone(item.type)}>{item.type ?? 'memory'}</Badge>
+                <span className="font-mono text-[10px] text-muted">
+                  importance {Math.round(item.importance * 100)}%
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] leading-5 text-slate-600">{item.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function QualityCard({ evaluation }: { evaluation?: EvaluationPayload }) {
+  if (!evaluation) {
+    return (
+      <Card className="p-4">
+        <div className="text-sm font-semibold text-ink">Quality</div>
+        <p className="mt-3 text-xs text-muted">
+          No evaluation was recorded for this run. Failed or cancelled runs skip the post-run checks.
+        </p>
+      </Card>
+    );
+  }
+
+  const criteria: Array<[string, string]> = [
+    ['completeness', 'Completeness'],
+    ['accuracy', 'Accuracy'],
+    ['groundedness', 'Groundedness'],
+    ['taskCompletion', 'Task completion'],
+  ];
+
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-semibold text-ink">Quality</div>
+        <div className="flex items-center gap-2">
+          <Badge tone="neutral">Rule-based</Badge>
+          <Badge tone={evaluation.score >= 0.8 ? 'success' : 'warning'}>
+            {Math.round(evaluation.score * 100)} / 100
+          </Badge>
+        </div>
+      </div>
+      <p className="mt-1 text-[10px] text-muted">
+        Heuristic rules (structure, tool success, RAG evidence, completion), not an LLM judge.
+      </p>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {criteria.map(([key, label]) => {
+          const value = evaluation.criteria?.[key];
+          return (
+            <div key={key}>
+              <div className="mb-1 flex items-center justify-between text-[11px]">
+                <span className="text-muted">{label}</span>
+                <span className="font-mono text-ink">
+                  {typeof value === 'number' ? Math.round(value * 100) : '—'}
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-slate-700"
+                  style={{ width: `${typeof value === 'number' ? value * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {evaluation.feedback && evaluation.feedback.length > 0 ? (
+        <ul className="mt-3 space-y-1 text-[11px] leading-5 text-slate-600">
+          {evaluation.feedback.map((item, index) => (
+            <li key={index}>· {item}</li>
+          ))}
+        </ul>
+      ) : null}
+    </Card>
+  );
+}
+
+function EventsCard({ events }: { events: AgentEvent[] }) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-ink">Event history</div>
+        <Badge>{events.length} events</Badge>
+      </div>
+      <p className="mt-1 text-[10px] text-muted">
+        Stored on the server as JSONL; answer deltas are collapsed and not listed one by one.
+      </p>
+      <div className="mt-3 space-y-1">
+        {events
+          .filter((event) => !isAnswerDelta(event))
+          .map((event) => (
+            <EventRow key={event.id} event={event} />
+          ))}
+      </div>
+    </Card>
   );
 }
 
@@ -266,6 +470,51 @@ function Row({ label, value }: { label: string; value: string }) {
       <dd className="truncate font-mono text-ink">{value}</dd>
     </div>
   );
+}
+
+function readEvidence(events: AgentEvent[]): EvidenceDoc[] {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (events[index].type !== 'rag_retrieve') continue;
+    const documents = (events[index].payload as { documents?: unknown }).documents;
+    if (Array.isArray(documents)) return documents as EvidenceDoc[];
+  }
+  return [];
+}
+
+function readMemory(events: AgentEvent[]): MemoryItem[] {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (events[index].type !== 'memory_update') continue;
+    const items = (events[index].payload as { items?: unknown }).items;
+    if (Array.isArray(items)) return items as MemoryItem[];
+  }
+  return [];
+}
+
+function readEvaluation(events: AgentEvent[]): EvaluationPayload | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    if (events[index].type !== 'evaluation_complete') continue;
+    const payload = events[index].payload as Partial<EvaluationPayload>;
+    if (typeof payload.score === 'number') {
+      return {
+        score: payload.score,
+        criteria: payload.criteria,
+        feedback: payload.feedback,
+      };
+    }
+  }
+  return undefined;
+}
+
+function documentTitle(document: EvidenceDoc): string {
+  const title = document.metadata?.title;
+  return typeof title === 'string' && title ? title : document.id;
+}
+
+function memoryTone(type?: string): 'success' | 'warning' | 'info' | 'neutral' {
+  if (type === 'semantic') return 'success';
+  if (type === 'working') return 'warning';
+  if (type === 'episodic') return 'info';
+  return 'neutral';
 }
 
 function isAnswerDelta(event: AgentEvent): boolean {

@@ -146,16 +146,18 @@ export function buildRuntimeDependencyEdges(objects: RuntimeObject[]): RuntimeDe
     if (workflow) addEdge(edges, workflow, tool, 'execute');
     else if (planner) addEdge(edges, planner, tool, 'execute');
   });
-  tools.forEach((tool) => {
-    if (memory) addEdge(edges, tool, memory, 'write');
-    if (reflection) addEdge(edges, tool, reflection, 'result');
-  });
-  if (knowledge && reflection) addEdge(edges, knowledge, reflection, 'evidence');
-  if (memory && reflection) addEdge(edges, memory, reflection, 'memory');
-  if (reflection && evaluation) addEdge(edges, reflection, evaluation, 'judge');
-  if (evaluation && answer) addEdge(edges, evaluation, answer, 'quality');
-  if (!evaluation && reflection && answer) addEdge(edges, reflection, answer, 'answer');
-  if (!reflection && tools.length > 0 && answer) addEdge(edges, tools[tools.length - 1], answer, 'answer');
+
+  // Post-run checks read the tool results and retrieved evidence, then write
+  // memory before the answer is delivered.
+  const lastTool = tools[tools.length - 1];
+  if (lastTool && evaluation) addEdge(edges, lastTool, evaluation, 'result');
+  if (knowledge && evaluation) addEdge(edges, knowledge, evaluation, 'evidence');
+  if (evaluation && reflection) addEdge(edges, evaluation, reflection, 'judge');
+  if (reflection && memory) addEdge(edges, reflection, memory, 'write');
+  if (memory && answer) addEdge(edges, memory, answer, 'deliver');
+  if (lastTool && !evaluation && reflection) addEdge(edges, lastTool, reflection, 'result');
+  if (reflection && !memory && answer) addEdge(edges, reflection, answer, 'deliver');
+  if (lastTool && !evaluation && !reflection && answer) addEdge(edges, lastTool, answer, 'answer');
   if (planner && answer && edges.length === 0) addEdge(edges, planner, answer, 'answer');
 
   return edges;
@@ -163,6 +165,8 @@ export function buildRuntimeDependencyEdges(objects: RuntimeObject[]): RuntimeDe
 
 export function getCurrentRuntimeObjectId(objects: RuntimeObject[]): string | undefined {
   return (
+    objects.find((object) => object.status === 'failed' && object.type !== 'workflow')?.id ??
+    objects.find((object) => object.status === 'cancelled')?.id ??
     objects.find((object) => object.status === 'running')?.id ??
     [...objects].reverse().find((object) => object.status === 'success')?.id ??
     objects.find((object) => object.status === 'waiting')?.id
@@ -229,10 +233,10 @@ function getParentId(object: RuntimeObject, objects: RuntimeObject[]): string | 
   if (object.type === 'workflow') return planner?.id;
   if (object.type === 'knowledge') return planner?.id;
   if (object.type === 'tool') return workflow?.id ?? planner?.id;
-  if (object.type === 'memory') return latestTool?.id ?? workflow?.id;
-  if (object.type === 'reflection') return memory?.id ?? knowledge?.id ?? latestTool?.id;
-  if (object.type === 'evaluation') return reflection?.id;
-  if (object.type === 'answer') return evaluation?.id ?? reflection?.id ?? latestTool?.id;
+  if (object.type === 'memory') return reflection?.id ?? latestTool?.id ?? workflow?.id;
+  if (object.type === 'reflection') return evaluation?.id ?? latestTool?.id;
+  if (object.type === 'evaluation') return latestTool?.id ?? knowledge?.id ?? workflow?.id;
+  if (object.type === 'answer') return memory?.id ?? reflection?.id ?? evaluation?.id;
   return undefined;
 }
 
@@ -248,10 +252,10 @@ function getDependencyIds(object: RuntimeObject, objects: RuntimeObject[]): stri
   if (object.type === 'workflow') return compact([planner?.id]);
   if (object.type === 'knowledge') return compact([planner?.id]);
   if (object.type === 'tool') return compact([workflow?.id ?? planner?.id]);
-  if (object.type === 'memory') return tools.map((tool) => tool.id);
-  if (object.type === 'reflection') return compact([knowledge?.id, memory?.id, ...tools.map((tool) => tool.id)]);
-  if (object.type === 'evaluation') return compact([reflection?.id]);
-  if (object.type === 'answer') return compact([evaluation?.id, reflection?.id, knowledge?.id]);
+  if (object.type === 'memory') return compact([reflection?.id, ...tools.map((tool) => tool.id)]);
+  if (object.type === 'reflection') return compact([evaluation?.id]);
+  if (object.type === 'evaluation') return compact([knowledge?.id, ...tools.map((tool) => tool.id)]);
+  if (object.type === 'answer') return compact([memory?.id, reflection?.id, evaluation?.id]);
   return [];
 }
 

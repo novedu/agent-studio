@@ -72,17 +72,28 @@ export function buildExecutionNodes(input: ExecutionModelInput): ExecutionNodeRe
     buildWorkflowNode(input),
     ...buildToolNodes(input),
     buildRagNode(input),
+    // The runtime emits post-run checks (evaluation -> reflection -> memory)
+    // before the final answer, so the graph uses the same order.
+    buildEvaluationNode(input),
     buildReflectionNode(input),
     buildMemoryNode(input),
-    buildEvaluationNode(input),
     {
       id: 'answer',
       kind: 'answer',
       component: 'Answer',
-      summary: latestAssistant?.content ? 'Final response generated' : 'Waiting for final answer',
+      summary:
+        input.status === 'error' || input.status === 'cancelled'
+          ? 'No final answer: the run did not complete'
+          : latestAssistant?.content
+            ? 'Final response generated'
+            : 'Waiting for final answer',
       status: getAnswerStatus(input.status, latestAssistant?.content),
       startTime: getFirstEvent(input.events, 'final_answer')?.timestamp,
       endTime: getLastEvent(input.events, 'final_answer')?.timestamp,
+      duration: getDuration(
+        getFirstEvent(input.events, 'final_answer')?.timestamp,
+        getLastEvent(input.events, 'final_answer')?.timestamp,
+      ),
       input: input.plan?.goal,
       output: latestAssistant?.content,
       metadata: { messageId: latestAssistant?.id },
@@ -95,6 +106,10 @@ export function buildExecutionNodes(input: ExecutionModelInput): ExecutionNodeRe
 
 export function getCurrentNodeId(nodes: ExecutionNodeRecord[]): string | undefined {
   return (
+    // A failed step is what the user needs to see; the workflow wrapper failing
+    // with it is not actionable.
+    nodes.find((node) => node.status === 'failed' && node.kind !== 'workflow')?.id ??
+    nodes.find((node) => node.status === 'cancelled')?.id ??
     nodes.find((node) => node.status === 'running' && node.kind !== 'workflow')?.id ??
     nodes.find((node) => node.status === 'running')?.id ??
     [...nodes].reverse().find((node) => node.status === 'success')?.id ??
@@ -231,24 +246,27 @@ function buildToolNode(
   planStatus?: StepStatus,
   planArgs?: Record<string, unknown>,
 ): ExecutionNodeRecord {
-  const startEvent = input.events.find(
-    (event) => event.type === 'tool_start' && getToolName(event) === toolName,
+  const toolEvents = input.events.filter(
+    (event) =>
+      (event.type === 'tool_start' || event.type === 'tool_success' || event.type === 'tool_error') &&
+      getToolName(event) === toolName,
   );
-  const successEvent = input.events.find(
-    (event) => event.type === 'tool_success' && getToolName(event) === toolName,
-  );
-  const errorEvent = input.events.find(
-    (event) => event.type === 'tool_error' && getToolName(event) === toolName,
-  );
+  const startEvent = [...toolEvents].reverse().find((event) => event.type === 'tool_start');
+  const successEvent = [...toolEvents].reverse().find((event) => event.type === 'tool_success');
+  const errorEvent = [...toolEvents].reverse().find((event) => event.type === 'tool_error');
   const endEvent = successEvent ?? errorEvent;
-  const retryEvent = input.events.find((event) => event.type === 'task_retry');
+  const retryEvent = [...input.events].reverse().find((event) => event.type === 'task_retry');
   const status = toExplorerStatus(tool?.status ?? planStatus);
+  const eventAttempts = toolEvents
+    .map((event) => (event.payload as { attemptNo?: unknown } | undefined)?.attemptNo)
+    .filter((value): value is number => typeof value === 'number');
+  const attemptCount = Math.max(1, tool?.attemptNo ?? 1, ...eventAttempts);
 
   return {
     id: `tool:${id}`,
     kind: 'tool',
     component: toolName,
-    summary,
+    summary: attemptCount > 1 ? `${summary} · ${attemptCount} attempts` : summary,
     status,
     duration: tool?.duration ?? getDuration(startEvent?.timestamp, endEvent?.timestamp),
     startTime: startEvent?.timestamp,
@@ -261,7 +279,10 @@ function buildToolNode(
       hadError: Boolean(errorEvent),
       recoveredByRetry: Boolean(errorEvent && retryEvent && status === 'success'),
       retryEventId: retryEvent?.id,
-      retryCount: readRetryCount(retryEvent?.payload),
+      retryCount: attemptCount - 1,
+      attemptCount,
+      attemptNo: tool?.attemptNo ?? 1,
+      attempts: buildAttempts(toolEvents),
       error: readErrorMessage(errorEvent?.payload),
     },
     trace: [startEvent, errorEvent, retryEvent, successEvent].filter(Boolean),
@@ -311,20 +332,29 @@ function buildMemoryNode(input: ExecutionModelInput): ExecutionNodeRecord {
 }
 
 function buildReflectionNode(input: ExecutionModelInput): ExecutionNodeRecord {
-  const reflectionEvent = getFirstEvent(input.events, 'reflection');
+  // A retried run keeps the previous attempt's events, so use the latest
+  // reflection instead of the first one.
+  const reflectionEvent = getLastEvent(input.events, 'reflection');
+  const reflectionStatus = getPayloadStatus(reflectionEvent?.payload);
+  const passed = reflectionStatus === 'passed';
+  const failed = reflectionStatus === 'failed' || reflectionStatus === 'needs_replanning';
 
   return {
     id: 'reflection',
     kind: 'reflection',
     component: 'Reflection',
-    summary: reflectionEvent ? 'Result reviewed by reflection' : 'Waiting for reflection',
-    status: reflectionEvent ? 'success' : 'waiting',
+    summary: reflectionEvent
+      ? failed
+        ? 'Reflection did not pass'
+        : 'Result reviewed by reflection'
+      : 'Waiting for reflection',
+    status: reflectionEvent ? (failed ? 'failed' : 'success') : 'waiting',
     startTime: reflectionEvent?.timestamp,
     endTime: reflectionEvent?.timestamp,
     duration: 0,
     input: input.evaluation,
     output: reflectionEvent?.payload,
-    metadata: { status: getPayloadStatus(reflectionEvent?.payload) },
+    metadata: { status: reflectionStatus, passed },
     trace: getEventsByTypes(input.events, ['reflection']),
   };
 }
@@ -372,10 +402,11 @@ function getPlannerStatus(input: ExecutionModelInput): ExecutionNodeStatus {
 }
 
 function getAnswerStatus(status: string, content?: string): ExecutionNodeStatus {
+  // A failed run has no answer even though the transcript may contain a failure
+  // note in the assistant slot.
+  if (status === 'error') return 'skipped';
   if (status === 'cancelled') return 'cancelled';
-  if (status === 'error') return 'failed';
-  if (content && status === 'running') return 'running';
-  if (content) return 'success';
+  if (content) return status === 'running' ? 'running' : 'success';
   return 'waiting';
 }
 
@@ -415,16 +446,60 @@ function getPayloadStatus(payload: unknown): string | undefined {
   return typeof status === 'string' ? status : undefined;
 }
 
+function buildAttempts(toolEvents: AgentEvent[]): Array<{
+  attemptNo: number;
+  status: 'running' | 'success' | 'failed';
+  args?: Record<string, unknown>;
+  duration?: number;
+  error?: string;
+}> {
+  const byAttempt = new Map<
+    number,
+    {
+      attemptNo: number;
+      status: 'running' | 'success' | 'failed';
+      args?: Record<string, unknown>;
+      duration?: number;
+      error?: string;
+    }
+  >();
+
+  for (const event of toolEvents) {
+    const payload = event.payload as {
+      attemptNo?: unknown;
+      args?: unknown;
+      result?: { duration?: unknown };
+      error?: unknown;
+    };
+    const attemptNo = typeof payload.attemptNo === 'number' ? payload.attemptNo : 1;
+    const current =
+      byAttempt.get(attemptNo) ?? { attemptNo, status: 'running' as const };
+
+    if (event.type === 'tool_start') {
+      current.status = 'running';
+      if (payload.args && typeof payload.args === 'object' && !Array.isArray(payload.args)) {
+        current.args = payload.args as Record<string, unknown>;
+      }
+    }
+    if (event.type === 'tool_success') {
+      current.status = 'success';
+      if (typeof payload.result?.duration === 'number') current.duration = payload.result.duration;
+    }
+    if (event.type === 'tool_error') {
+      current.status = 'failed';
+      current.error = readErrorMessage(event.payload);
+    }
+
+    byAttempt.set(attemptNo, current);
+  }
+
+  return [...byAttempt.values()].sort((a, b) => a.attemptNo - b.attemptNo);
+}
+
 function readErrorMessage(payload: unknown): string | undefined {
   if (!payload || typeof payload !== 'object') return undefined;
   const error = (payload as { error?: unknown }).error;
   if (!error || typeof error !== 'object') return undefined;
   const message = (error as { message?: unknown }).message;
   return typeof message === 'string' ? message : undefined;
-}
-
-function readRetryCount(payload: unknown): number | undefined {
-  if (!payload || typeof payload !== 'object') return undefined;
-  const retryCount = (payload as { retryCount?: unknown }).retryCount;
-  return typeof retryCount === 'number' ? retryCount : undefined;
 }

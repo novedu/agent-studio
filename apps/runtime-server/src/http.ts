@@ -2,8 +2,13 @@ import { createServer as createNodeServer, type IncomingMessage, type Server, ty
 import { URL } from 'node:url';
 import type { AgentServerApp } from './app';
 import { createEventStream, sseHeaders } from './sse/event-stream';
-import { getLLMProviderName } from './env';
-import type { ApiErrorResponse, CreateAgentTaskRequest } from '@shared-types/api';
+import { getRuntimeModelInfo } from './env';
+import type {
+  ApiErrorResponse,
+  CreateAgentTaskRequest,
+  RetryAgentTaskRequest,
+  RetryAgentTaskStepRequest,
+} from '@shared-types/api';
 
 export interface CreateHttpServerOptions {
   app: AgentServerApp;
@@ -35,7 +40,13 @@ async function handleRequest(app: AgentServerApp, req: IncomingMessage, res: Ser
   }
 
   if (method === 'GET' && pathname === '/health') {
-    sendJson(res, 200, { status: 'ok', provider: getLLMProviderName() });
+    const modelInfo = getRuntimeModelInfo();
+    sendJson(res, 200, {
+      status: 'ok',
+      provider: modelInfo.provider,
+      model: modelInfo.model,
+      label: modelInfo.label,
+    });
     return;
   }
 
@@ -54,20 +65,36 @@ async function handleRequest(app: AgentServerApp, req: IncomingMessage, res: Ser
   const taskCancelMatch = pathname.match(/^\/api\/agent\/tasks\/([^/]+)\/cancel$/);
   if (method === 'POST' && taskCancelMatch) {
     const result = await app.handlers.cancelTask(taskCancelMatch[1]);
-    sendJson(res, isApiError(result) ? 404 : 200, result);
+    sendJson(res, isApiError(result) ? errorStatus(result) : 200, result);
     return;
   }
 
   const taskRetryMatch = pathname.match(/^\/api\/agent\/tasks\/([^/]+)\/retry$/);
   if (method === 'POST' && taskRetryMatch) {
-    const result = await app.handlers.retryTask(taskRetryMatch[1]);
+    const body = await readJsonBody<RetryAgentTaskRequest>(req);
+    const result = await app.handlers.retryTask(taskRetryMatch[1], body);
     sendJson(res, isApiError(result) ? 400 : 200, result);
+    return;
+  }
+
+  const taskStepRetryMatch = pathname.match(/^\/api\/agent\/tasks\/([^/]+)\/steps\/([^/]+)\/retry$/);
+  if (method === 'POST' && taskStepRetryMatch) {
+    const body = await readJsonBody<RetryAgentTaskStepRequest>(req);
+    const result = await app.handlers.retryTaskStep(taskStepRetryMatch[1], taskStepRetryMatch[2], body);
+    sendJson(res, isApiError(result) ? errorStatus(result) : 200, result);
     return;
   }
 
   const taskEventsMatch = pathname.match(/^\/api\/agent\/tasks\/([^/]+)\/events$/);
   if (method === 'GET' && taskEventsMatch) {
-    handleSse(app, taskEventsMatch[1], req, res);
+    handleSse(app, taskEventsMatch[1], req, res, url.searchParams.get('after') ?? undefined);
+    return;
+  }
+
+  const taskHistoryMatch = pathname.match(/^\/api\/agent\/tasks\/([^/]+)\/history$/);
+  if (method === 'GET' && taskHistoryMatch) {
+    const result = await app.handlers.getTaskHistory(taskHistoryMatch[1]);
+    sendJson(res, isApiError(result) ? 404 : 200, result);
     return;
   }
 
@@ -91,6 +118,7 @@ function handleSse(
   taskId: string,
   req: IncomingMessage,
   res: ServerResponse,
+  afterEventId?: string,
 ): void {
   res.writeHead(200, {
     ...sseHeaders,
@@ -118,7 +146,7 @@ function handleSse(
       unsubscribe();
       stream.close();
     }
-  });
+  }, afterEventId);
 
   if (typeof unsubscribeOrError !== 'function') {
     clearInterval(heartbeat);
@@ -174,6 +202,20 @@ function sendEmpty(res: ServerResponse, statusCode: number): void {
 
 function isApiError(value: unknown): value is ApiErrorResponse {
   return Boolean(value && typeof value === 'object' && 'error' in value);
+}
+
+function errorStatus(error: ApiErrorResponse): number {
+  if (error.error.code === 'TASK_NOT_FOUND' || error.error.code === 'STEP_NOT_FOUND') return 404;
+  if (
+    error.error.code === 'TASK_NOT_CANCELLABLE' ||
+    error.error.code === 'TASK_NOT_RETRYABLE' ||
+    error.error.code === 'STEP_NOT_RETRYABLE' ||
+    error.error.code === 'MAX_RETRY_EXCEEDED' ||
+    error.error.code === 'RETRY_CONTEXT_EXPIRED'
+  ) {
+    return 409;
+  }
+  return 400;
 }
 
 const corsHeaders = {

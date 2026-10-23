@@ -1,3 +1,4 @@
+import { useAgentStore } from '../../store/agentStore';
 import type {
   AgentEvent,
   AgentStateSnapshot,
@@ -45,6 +46,7 @@ export interface BuildRuntimeOverviewInput {
   status: string;
   currentNodeComponent?: string;
   currentTool?: string;
+  modelLabel?: string;
 }
 
 export function buildRuntimeOverview(input: BuildRuntimeOverviewInput): RuntimeOverview {
@@ -71,7 +73,7 @@ export function buildRuntimeOverview(input: BuildRuntimeOverviewInput): RuntimeO
 
   return {
     status: input.status,
-    model: getRuntimeModelLabel(),
+    model: input.modelLabel ?? getRuntimeModelLabel(),
     environment: getRuntimeEnvironmentLabel(),
     taskLabel: latestUserMessage?.content ?? input.plan?.goal ?? 'No running task',
     currentStep,
@@ -86,6 +88,18 @@ export function buildRuntimeOverview(input: BuildRuntimeOverviewInput): RuntimeO
     latestEvent: latestEvent ? formatEventType(latestEvent.type) : undefined,
     availableSignals: buildRuntimeSignals(input),
   };
+}
+
+export function useRuntimeModelLabel(): string {
+  const provider = useAgentStore((state) => state.runtimeProvider);
+  const model = useAgentStore((state) => state.runtimeModel);
+
+  if (provider === 'mock') return 'Mock · 模板';
+  if (provider && model) {
+    const vendor = provider === 'deepseek' ? 'DeepSeek' : provider === 'openai' ? 'OpenAI' : provider;
+    return `${vendor} · ${model}`;
+  }
+  return getRuntimeModelLabel();
 }
 
 export function getRuntimeModelLabel(): string {

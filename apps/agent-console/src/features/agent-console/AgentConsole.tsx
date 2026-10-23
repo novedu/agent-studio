@@ -1,5 +1,5 @@
 import { ChevronDownIcon, PlayIcon } from '../../components/ui';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChatPanel } from '../../components/chat/ChatPanel';
 import {
   DockViewSwitch,
@@ -18,9 +18,8 @@ import {
 import type { AgentEvent, CitationRecord, MemoryRecord } from '../../types/agent';
 import { RuntimeInspector } from '../../components/inspector';
 import { useAgentStream } from '../../hooks/useAgentStream';
-import { checkAgentServerHealth } from '../../services/agent';
 import { useAgentStore } from '../../store/agentStore';
-import { buildRuntimeOverview, type RuntimeOverview } from './runtime-overview';
+import { buildRuntimeOverview, useRuntimeModelLabel, type RuntimeOverview } from './runtime-overview';
 import {
   buildRuntimeDependencyEdges,
   buildRuntimeObjects,
@@ -28,11 +27,10 @@ import {
 } from './runtime-object-model';
 
 const defaultTask = '分析华东区域销售下降原因，并生成报告';
-const retryDemoTask = '演示销售分析 Agent 的 Tool Error、Retry、Reflection 和 Success 链路';
+const failureDemoTask = '演示工具失败：预检华中区域销售数据，失败后用修正参数重试';
 
 export function AgentConsole() {
-  const { start, stop } = useAgentStream();
-  const retryDemoTimersRef = useRef<number[]>([]);
+  const { start, stop, retryStep } = useAgentStream();
   const {
     messages,
     plan,
@@ -45,8 +43,6 @@ export function AgentConsole() {
     state,
     status,
     isStreaming,
-    beginTask,
-    updateFromEvent,
   } = useAgentStore();
 
   const nodes = useMemo(
@@ -93,27 +89,21 @@ export function AgentConsole() {
   const [highlightedTraceId, setHighlightedTraceId] = useState<string>();
   const [runtimeDockExpanded, setRuntimeDockExpanded] = useState(false);
   const [dockView, setDockView] = useState<DockView>('graph');
-  const [runtimeProvider, setRuntimeProvider] = useState<string | undefined>(undefined);
   const [runtimeDockManuallyToggled, setRuntimeDockManuallyToggled] = useState(false);
-  useEffect(() => {
-    let active = true;
-    checkAgentServerHealth()
-      .then((health) => {
-        if (active) setRuntimeProvider(health.provider);
-      })
-      .catch(() => {
-        if (active) setRuntimeProvider(undefined);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const modelLabel = useRuntimeModelLabel();
 
   function handleNewConversation() {
     useAgentStore.getState().startNewConversation();
   }
 
   const lastError = useAgentStore((state) => state.lastError);
+  const failedTool = useMemo(
+    () =>
+      status === 'error'
+        ? [...tools].reverse().find((tool) => tool.status === 'failed' && tool.stepId)
+        : undefined,
+    [status, tools],
+  );
 
   const focusedObjectType = focusedRuntimeObject?.type;
   const focusedObjectId = focusedRuntimeObject?.id;
@@ -141,12 +131,14 @@ export function AgentConsole() {
         status,
         currentNodeComponent: currentNode?.component,
         currentTool,
+        modelLabel,
       }),
     [
       citations,
       currentNode?.component,
       currentTool,
       evaluation,
+      modelLabel,
       events,
       memory,
       messages,
@@ -188,16 +180,16 @@ export function AgentConsole() {
     hasTaskActivity,
   ]);
 
-  useEffect(
-    () => () => {
-      clearRetryDemoTimers(retryDemoTimersRef.current);
-    },
-    [],
-  );
-
   useEffect(() => {
-    if (status === 'running' && hasTaskActivity && !runtimeDockManuallyToggled) {
+    if (runtimeDockManuallyToggled) return;
+    if (status === 'running' && hasTaskActivity) {
       setRuntimeDockExpanded(true);
+    }
+    // On failure the error card and the args editor matter more than the graph.
+    // Collapse the dock so the whole failure card fits in the transcript; the
+    // user can expand it again when they want to inspect the node.
+    if (status === 'error') {
+      setRuntimeDockExpanded(false);
     }
   }, [hasTaskActivity, runtimeDockManuallyToggled, status]);
 
@@ -306,10 +298,12 @@ export function AgentConsole() {
               onStartTask={(input = defaultTask) => {
                 runServerTask(input);
               }}
-              onStartRetryDemo={runRetryDemo}
+              onStartFailureDemo={() => runServerTask(failureDemoTask)}
+              failedTool={failedTool}
+              onRetryStep={handleRetryStep}
+              cancelled={status === 'cancelled'}
               runtimeOverview={runtimeOverview}
               runtimeObjects={runtimeObjects}
-              runtimeProvider={runtimeProvider}
               onNewConversation={handleNewConversation}
               errorMessage={lastError}
               onRetry={latestUserMessage ? () => runServerTask(latestUserMessage.content) : undefined}
@@ -350,7 +344,7 @@ export function AgentConsole() {
                       onSelectNode={handleGraphSelect}
                     />
                   ) : (
-                    <ExecutionGraphEmptyState onStart={() => runServerTask(defaultTask)} onStartRetryDemo={runRetryDemo} />
+                    <ExecutionGraphEmptyState onStart={() => runServerTask(defaultTask)} onStartFailureDemo={() => runServerTask(failureDemoTask)} />
                   )}
                 </div>
 
@@ -418,7 +412,6 @@ export function AgentConsole() {
   );
 
   function runServerTask(input: string) {
-    clearRetryDemoTimers(retryDemoTimersRef.current);
     setRuntimeDockManuallyToggled(false);
     setRuntimeDockExpanded(true);
     setAutoFollowRuntime(true);
@@ -426,25 +419,15 @@ export function AgentConsole() {
   }
 
   function handleStop() {
-    clearRetryDemoTimers(retryDemoTimersRef.current);
-    stop();
+    void stop();
   }
 
-  function runRetryDemo() {
-    clearRetryDemoTimers(retryDemoTimersRef.current);
+  function handleRetryStep(args: Record<string, unknown>) {
+    if (!failedTool?.stepId) return;
     setRuntimeDockManuallyToggled(false);
     setRuntimeDockExpanded(true);
     setAutoFollowRuntime(true);
-    beginTask(retryDemoTask);
-    buildRetryDemoEvents().forEach((event, index) => {
-      const timer = window.setTimeout(() => {
-        updateFromEvent({
-          ...event,
-          timestamp: Date.now(),
-        });
-      }, index * 180);
-      retryDemoTimersRef.current.push(timer);
-    });
+    void retryStep(failedTool.stepId, args);
   }
 }
 
@@ -466,7 +449,7 @@ function RuntimeDockCollapsed({
     { label: 'Planner', kind: 'planner' },
     { label: 'Tool', kind: 'tool' },
     { label: 'RAG', kind: 'rag' },
-    { label: 'Memory', kind: 'memory' },
+    { label: 'Eval', kind: 'evaluation' },
     { label: 'Answer', kind: 'answer' },
   ];
   const statusLabel =
@@ -542,220 +525,11 @@ function RuntimeDockCollapsed({
   );
 }
 
-function clearRetryDemoTimers(timers: number[]) {
-  timers.forEach((timer) => window.clearTimeout(timer));
-  timers.length = 0;
-}
-
 function getInspectorSectionForRuntimeObject(object: RuntimeObject): string {
   if (object.type === 'knowledge') return 'knowledge';
   if (object.type === 'memory') return 'memory';
   if (object.type === 'evaluation') return 'evaluation';
   return 'trace';
-}
-
-function buildRetryDemoEvents(): AgentEvent[] {
-  const taskId = 'demo_retry_task';
-  let index = 0;
-  const event = (type: AgentEvent['type'], payload: unknown): AgentEvent => {
-    index += 1;
-    return {
-      id: `${taskId}_event_${String(index).padStart(4, '0')}`,
-      taskId,
-      type,
-      timestamp: Date.now(),
-      payload,
-    };
-  };
-  const plan = {
-    goal: retryDemoTask,
-    steps: [
-      {
-        id: '1',
-        tool: 'validateSalesRegion',
-        description: '预检销售数据源和区域参数',
-        args: { region: '华中' },
-        status: 'pending',
-      },
-      {
-        id: '2',
-        tool: 'querySalesData',
-        description: '切换到华东区域重新查询销售数据',
-        args: { region: '华东', month: '2024-02' },
-        status: 'pending',
-      },
-      {
-        id: '3',
-        tool: 'calculateMetrics',
-        description: '计算华东区域销售下降幅度',
-        args: { current: 980000, previous: 1250000, metric: 'growth' },
-        status: 'pending',
-      },
-      {
-        id: '4',
-        tool: 'searchKnowledge',
-        description: '检索销售下降原因和渠道证据',
-        args: { query: '华东 销售下降 渠道 原因', limit: 3 },
-        status: 'pending',
-      },
-      {
-        id: '5',
-        tool: 'llm',
-        description: '反思失败恢复过程并生成最终报告',
-        status: 'pending',
-      },
-    ],
-  };
-  const documents = [
-    {
-      id: 'KB002',
-      content:
-        '华东区域销售下降常见原因：春节后需求回落、渠道补货节奏放缓、重点客户预算延后，以及竞品在低线城市加大折扣。',
-      metadata: { title: '华东销售下降原因分析', category: 'Sales', updatedAt: '2024-05-08' },
-      score: 0.92,
-    },
-    {
-      id: 'KB003',
-      content: '企业软件行业 Q2 采购审批周期延长，预算释放更偏向刚需项目，非核心系统采购容易被延后。',
-      metadata: { title: '行业趋势报告-2024Q2', category: 'Industry', updatedAt: '2024-06-12' },
-      score: 0.78,
-    },
-  ];
-  const finalAnswer = [
-    '# Tool Error → Retry → Success 演示报告',
-    '',
-    '## Runtime 结论',
-    '',
-    'Agent 首次预检区域参数时发现 **华中** 不在当前销售数据源支持范围内，因此触发 Tool Error。随后 Runtime 进入 Retry，切换到可用的 **华东** 数据源继续执行。',
-    '',
-    '## 恢复后的分析结果',
-    '',
-    '- 华东 2024-02 营收为 **¥980000**，较 2024-01 的 **¥1250000** 下降 **21.60%**。',
-    '- RAG 证据显示，下降原因可能包括春节后需求回落、渠道补货放缓、重点客户预算延后和竞品折扣加剧。',
-    '- Memory 已保存本次失败恢复摘要，Reflection 判定链路完整。',
-    '',
-    '## 建议',
-    '',
-    '1. 对区域参数增加预校验，减少无效 Tool Call。',
-    '2. 保留 Tool Error 和 Retry Trace，方便复盘失败恢复路径。',
-    '3. 对华东渠道补货和重点客户预算延后进行专项跟进。',
-  ].join('\n');
-
-  return [
-    event('task_created', { input: retryDemoTask, status: 'running' }),
-    event('plan_start', { input: retryDemoTask }),
-    event('plan_update', { plan, steps: plan.steps }),
-    event('state_update', { status: 'running', currentStep: 'validateSalesRegion', completedStepIds: [], progress: 12 }),
-    event('tool_start', { toolName: 'validateSalesRegion', args: { region: '华中' } }),
-    event('tool_error', {
-      toolName: 'validateSalesRegion',
-      error: { message: '不支持的区域 "华中"，当前销售数据源仅支持：华东、华北、华南。' },
-    }),
-    event('task_retry', {
-      reason: '切换到已支持区域 "华东" 重新执行销售分析链路。',
-      retryCount: 1,
-      maxRetry: 2,
-    }),
-    event('state_update', { status: 'running', currentStep: 'querySalesData', completedStepIds: ['retry'], progress: 26 }),
-    event('tool_start', { toolName: 'querySalesData', args: { region: '华东', month: '2024-02' } }),
-    event('tool_success', {
-      toolName: 'querySalesData',
-      result: {
-        success: true,
-        toolName: 'querySalesData',
-        data: '华东 2024-02 销售数据：营收 ¥980000，订单 980 单，客单价 ¥1000',
-        duration: 150,
-      },
-    }),
-    event('state_update', { status: 'running', currentStep: 'calculateMetrics', completedStepIds: ['retry', '2'], progress: 42 }),
-    event('tool_start', { toolName: 'calculateMetrics', args: { current: 980000, previous: 1250000, metric: 'growth' } }),
-    event('tool_success', {
-      toolName: 'calculateMetrics',
-      result: {
-        success: true,
-        toolName: 'calculateMetrics',
-        data: '增长率：980000 vs 1250000 = -21.60%',
-        duration: 80,
-      },
-    }),
-    event('state_update', { status: 'running', currentStep: 'searchKnowledge', completedStepIds: ['retry', '2', '3'], progress: 58 }),
-    event('tool_start', { toolName: 'searchKnowledge', args: { query: '华东 销售下降 渠道 原因', limit: 3 } }),
-    event('tool_success', {
-      toolName: 'searchKnowledge',
-      result: {
-        success: true,
-        toolName: 'searchKnowledge',
-        data: {
-          query: '华东 销售下降 渠道 原因',
-          documents,
-          documentCount: documents.length,
-          retrievalDuration: 34,
-          logs: [
-            'searchKnowledge received query: 华东 销售下降 渠道 原因',
-            'Retriever topK: 3',
-            'Retriever returned 2 documents in 34ms',
-          ],
-        },
-        duration: 40,
-      },
-    }),
-    event('rag_retrieve', { query: '华东 销售下降 渠道 原因', documents, duration: 34 }),
-    event('memory_update', {
-      memoryType: 'episodic',
-      items: [
-        {
-          id: 'mem_retry_sales_1',
-          type: 'episodic',
-          content: '本次销售分析首次区域参数失败，Retry 后切换到华东并完成 Tool/RAG/Reflection/Evaluation 链路。',
-          importance: 0.82,
-        },
-        {
-          id: 'mem_retry_sales_2',
-          type: 'working',
-          content: '华东 2024-02 营收 ¥980000，环比下降 21.60%。',
-          importance: 0.76,
-        },
-      ],
-    }),
-    event('reflection', {
-      status: 'passed',
-      message: '已检查 Tool Error、Retry、RAG 证据和最终报告，失败恢复链路完整。',
-    }),
-    event('evaluation_start', { traceId: taskId }),
-    event('evaluation_complete', {
-      score: 0.88,
-      criteria: {
-        completeness: 0.9,
-        accuracy: 0.85,
-        groundedness: 0.9,
-        taskCompletion: 0.88,
-      },
-      feedback: ['评估通过：失败恢复过程可追踪，最终答案包含数据、证据和行动建议。'],
-    }),
-    event('state_update', {
-      status: 'completed',
-      currentStep: 'final_answer',
-      completedStepIds: ['retry', '2', '3', '4', '5'],
-      progress: 100,
-    }),
-    ...splitText(finalAnswer).map((delta) => event('final_answer', { delta })),
-    event('final_answer', { content: finalAnswer, done: true }),
-    event('task_complete', { status: 'completed', duration: 1680 }),
-  ];
-}
-
-function splitText(value: string): string[] {
-  const chunks: string[] = [];
-  let buffer = '';
-  for (const char of value) {
-    buffer += char;
-    if (buffer.length >= 12 || char === '\n' || char === '。' || char === '，') {
-      chunks.push(buffer);
-      buffer = '';
-    }
-  }
-  if (buffer) chunks.push(buffer);
-  return chunks;
 }
 
 function findCitation(citations: CitationRecord[], citationId?: string): CitationRecord | undefined {

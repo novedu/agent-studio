@@ -41,6 +41,12 @@ export interface WorkflowRunInput {
   userMessageId: string;
   userInput: string;
   state: AgentState;
+  /** Step index to resume from (0 for a normal run). */
+  startIndex?: number;
+  /** The step being retried; its args can be overridden. */
+  retryStepId?: string;
+  stepArgs?: Record<string, unknown>;
+  attemptNo?: number;
 }
 
 export interface WorkflowRunResult {
@@ -78,8 +84,10 @@ export class WorkflowRunner {
     let finalAnswer: string | undefined;
 
     const planSteps = input.state.getSteps().slice(0, this.maxSteps);
+    const startIndex = Math.max(0, Math.min(input.startIndex ?? 0, planSteps.length));
+    const attemptNo = input.attemptNo ?? 1;
 
-    for (let index = 0; index < planSteps.length; index++) {
+    for (let index = startIndex; index < planSteps.length; index++) {
       const planStep = planSteps[index];
       const workflowStartedAt = Date.now();
       const workflowStepTrace: WorkflowTraceStep = {
@@ -92,6 +100,10 @@ export class WorkflowRunner {
       };
 
       input.state.updateStep(planStep.id, 'running');
+
+      // Only the step being retried gets the new attempt number; later steps
+      // in the resumed run are still on their first attempt.
+      const stepAttemptNo = planStep.id === input.retryStepId ? attemptNo : 1;
 
       if (planStep.tool === 'llm') {
         const llmTraceStep = await this.runLLMStep(input, planStep.description, index + 1);
@@ -128,7 +140,9 @@ export class WorkflowRunner {
           });
 
           for (const toolCall of toolCalls) {
-            const toolTraceStep = await this.runToolStep(input, toolCall, index + 1);
+            // Tools called by the LLM do not belong to a single plan step;
+            // do not let them mark the surrounding LLM step as completed.
+            const toolTraceStep = await this.runToolStep(input, toolCall, index + 1, undefined, stepAttemptNo);
             traceSteps.push(toolTraceStep);
             workflowStepTrace.traceSteps.push(toolTraceStep);
             input.state.addToolResult(toolCall.name, toolTraceStep.toolResult!);
@@ -148,7 +162,10 @@ export class WorkflowRunner {
         const toolCall: ToolCall = {
           id: `call_plan_${planStep.id}`,
           name: planStep.tool,
-          args: planStep.args ?? {},
+          args: {
+            ...(planStep.args ?? {}),
+            ...(planStep.id === input.retryStepId ? input.stepArgs ?? {} : {}),
+          },
         };
 
         this.conversationManager.addMessage(input.conversationId, {
@@ -158,7 +175,7 @@ export class WorkflowRunner {
           toolCalls: [toolCall],
         });
 
-        const toolTraceStep = await this.runToolStep(input, toolCall, index + 1);
+        const toolTraceStep = await this.runToolStep(input, toolCall, index + 1, planStep.id, stepAttemptNo);
         traceSteps.push(toolTraceStep);
         workflowStepTrace.traceSteps.push(toolTraceStep);
         input.state.addToolResult(toolCall.name, toolTraceStep.toolResult!);
@@ -269,7 +286,13 @@ export class WorkflowRunner {
     }
   }
 
-  private async runToolStep(input: WorkflowRunInput, toolCall: ToolCall, stepNumber: number): Promise<TraceStep> {
+  private async runToolStep(
+    input: WorkflowRunInput,
+    toolCall: ToolCall,
+    stepNumber: number,
+    stepId: string | undefined,
+    attemptNo: number,
+  ): Promise<TraceStep> {
     const { id: toolCallId, name: toolName, args } = toolCall;
 
     this.eventEmitter.emit({
@@ -279,6 +302,8 @@ export class WorkflowRunner {
       messageId: input.userMessageId,
       toolName,
       args,
+      stepId,
+      attemptNo,
     });
 
     const traceStep: TraceStep = {
@@ -311,6 +336,8 @@ export class WorkflowRunner {
         messageId: input.userMessageId,
         toolName,
         result: toolResult,
+        stepId,
+        attemptNo,
       });
     } else {
       traceStep.status = 'error';
@@ -325,6 +352,8 @@ export class WorkflowRunner {
           type: this.getErrorType(toolResult.error!),
           message: toolResult.error!,
         },
+        stepId,
+        attemptNo,
       });
     }
 
@@ -407,7 +436,14 @@ export class WorkflowRunner {
   private getErrorType(errorMessage: string): 'not_found' | 'timeout' | 'argument' | 'execution' {
     if (errorMessage.includes('Not Found')) return 'not_found';
     if (errorMessage.includes('Timeout')) return 'timeout';
-    if (errorMessage.includes('Argument')) return 'argument';
+    if (
+      errorMessage.includes('Argument') ||
+      errorMessage.includes('不支持') ||
+      errorMessage.includes('暂无') ||
+      errorMessage.includes('不能为')
+    ) {
+      return 'argument';
+    }
     return 'execution';
   }
 

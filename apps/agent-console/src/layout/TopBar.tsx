@@ -1,17 +1,41 @@
+import { useEffect } from 'react';
 import { useAgentStore } from '@console/store/agentStore';
+import { checkAgentServerHealth } from '@console/services/agent';
 import {
   CpuIcon,
   RuntimeIcon,
   ServerIcon,
 } from '@console/components/ui';
-import { getRuntimeEnvironmentLabel, getRuntimeModelLabel } from '@console/features/agent-console/runtime-overview';
+import {
+  getRuntimeEnvironmentLabel,
+  useRuntimeModelLabel,
+} from '@console/features/agent-console/runtime-overview';
 
 export function TopBar() {
   const status = useAgentStore((state) => state.status);
   const events = useAgentStore((state) => state.events);
-  const currentStep = useAgentStore((state) => state.state?.currentStepId);
+  const runtimeState = useAgentStore((state) => state.state);
+  const currentStep = runtimeState?.currentStepId;
   const messages = useAgentStore((state) => state.messages);
   const plan = useAgentStore((state) => state.plan);
+  const setRuntimeInfo = useAgentStore((state) => state.setRuntimeInfo);
+  const modelLabel = useRuntimeModelLabel();
+
+  // Health is fetched once for every page, not only /agent, so the header can
+  // tell the truth about mock vs a real model.
+  useEffect(() => {
+    let active = true;
+    checkAgentServerHealth()
+      .then((health) => {
+        if (active) setRuntimeInfo({ provider: health.provider, model: health.model });
+      })
+      .catch(() => {
+        if (active) setRuntimeInfo({ provider: undefined, model: undefined });
+      });
+    return () => {
+      active = false;
+    };
+  }, [setRuntimeInfo]);
 
   const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user');
   const currentTask = latestUserMessage?.content;
@@ -45,7 +69,7 @@ export function TopBar() {
 
           {/* Selectors */}
           <Selector icon={<RuntimeIcon className="h-2.5 w-2.5" />} label="Workspace" value="Runtime" />
-          <Selector icon={<CpuIcon className="h-2.5 w-2.5" />} label="Model" value={getRuntimeModelLabel()} />
+          <Selector icon={<CpuIcon className="h-2.5 w-2.5" />} label="Model" value={modelLabel} />
           <Selector icon={<ServerIcon className="h-2.5 w-2.5" />} label="Environment" value={getRuntimeEnvironmentLabel()} />
 
           <div className="h-3 w-px bg-line" />
@@ -77,8 +101,20 @@ export function TopBar() {
             <>
               <Metric label="STATUS" value={status} tone={getStatusTone(status)} />
               <Metric label="TASK" value={currentTask ? truncate(currentTask, 24) : 'running'} />
-              <Metric label="STEP" value={currentStep ?? plan?.steps[0]?.id ?? 'planning'} />
-              <Metric label="PROGRESS" value={`${getProgress(events, plan)}%`} />
+              <Metric
+                label="STEP"
+                value={
+                  currentStep ??
+                  (status === 'success'
+                    ? 'answer'
+                    : status === 'cancelled'
+                      ? 'cancelled'
+                      : status === 'error'
+                        ? 'failed'
+                        : 'planning')
+                }
+              />
+              <Metric label="PROGRESS" value={`${getProgress(plan, runtimeState, status)}%`} />
               {status === 'success' && (
                 <>
                   <Metric label="DURATION" value={formatDuration(duration)} />
@@ -150,10 +186,11 @@ function Metric({
   );
 }
 
-function getStatusTone(status: string): 'success' | 'info' | 'danger' | 'default' {
+function getStatusTone(status: string): 'success' | 'info' | 'warning' | 'danger' | 'default' {
   if (status === 'running') return 'info';
   if (status === 'success' || status === 'completed') return 'success';
   if (status === 'error' || status === 'failed') return 'danger';
+  if (status === 'cancelled') return 'warning';
   return 'default';
 }
 
@@ -161,6 +198,7 @@ function getStatusLabel(status: string): string {
   if (status === 'running') return 'Agent running';
   if (status === 'success') return 'Completed';
   if (status === 'error') return 'Needs attention';
+  if (status === 'cancelled') return 'Cancelled';
   return 'Runtime ready';
 }
 
@@ -172,17 +210,25 @@ function getStatusDot(status: string): string {
         ? 'bg-emerald-500'
         : status === 'error'
           ? 'bg-rose-500'
-          : 'bg-emerald-500';
+          : status === 'cancelled'
+            ? 'bg-amber-500'
+            : 'bg-emerald-500';
   return `h-1 w-1 rounded-full ${tone}`;
 }
 
-function getProgress(events: unknown[], plan: { steps: unknown[] } | null): number {
-  if (!plan?.steps?.length) return 0;
-  const completed = events.filter((e) => {
-    const event = e as { type?: string };
-    return event.type?.includes('complete') || event.type?.includes('success');
-  }).length;
-  return Math.min(100, Math.round((completed / plan.steps.length) * 100));
+function getProgress(
+  plan: { steps: Array<{ status: string }> } | null,
+  state: { completedStepIds: string[] } | undefined,
+  status: string,
+): number {
+  // Single source of truth: completed plan steps, not the names of events.
+  if (plan?.steps.length) {
+    const completed = state?.completedStepIds.length
+      ? state.completedStepIds.length
+      : plan.steps.filter((step) => step.status === 'success').length;
+    return Math.min(100, Math.round((completed / plan.steps.length) * 100));
+  }
+  return status === 'success' ? 100 : 0;
 }
 
 function formatDuration(duration?: number): string {

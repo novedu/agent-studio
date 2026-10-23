@@ -28,7 +28,7 @@ async function main(): Promise<void> {
     const body = (await response.json()) as { status: string; provider?: string };
     assert.equal(body.status, 'ok');
     // The console shows a "Mock" badge when no model key is configured.
-    assert.ok(body.provider === 'mock' || body.provider === 'openai');
+    assert.ok(['mock', 'openai', 'deepseek'].includes(body.provider ?? ''));
     console.log('Runtime server health check passed.');
   } finally {
     await new Promise<void>((resolve, reject) => {

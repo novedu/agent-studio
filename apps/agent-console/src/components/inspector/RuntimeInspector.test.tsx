@@ -79,7 +79,7 @@ describe('RuntimeInspector', () => {
     expect(html).toContain('querySalesData');
     expect(html).toContain('Arguments');
     expect(html).toContain('Dependency Context');
-    expect(html).toContain('Trace Spans');
+    expect(html).toContain('Runtime Events');
 
     act(() => {
       root?.unmount();

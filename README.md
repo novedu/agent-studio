@@ -14,7 +14,7 @@ TypeScript · React · Node.js · Zustand · SSE · npm workspaces ｜ LLM 接�
 
 > Agent 执行是黑盒：调了哪个工具、检索到什么、为什么失败，都看不到。
 > 这个项目用 Runtime Event 记录全过程，并投影到 Chat / Graph / Timeline / Inspector 四个同步视图；
-> 一次演示任务会走完 Planning → Tool Call → Knowledge Retrieval → Memory Update → Reflection → Evaluation → Final Answer。
+> 一次演示任务会走完 Planning → Tool Call → Knowledge Retrieval → Evaluation → Reflection → Memory Update → Final Answer。
 
 ## Project Introduction
 
@@ -29,20 +29,22 @@ The main demo starts with:
 The runtime then moves through:
 
 ```text
-Planning -> Tool Call -> Knowledge Retrieval -> Memory Update -> Reflection -> Evaluation -> Final Answer
+Planning -> Tool Call -> Knowledge Retrieval -> Evaluation -> Reflection -> Memory Update -> Final Answer
 ```
 
 The `/agent` page is the product center. Chat is the primary workspace. Graph explains runtime dependency. Timeline debugs event flow. Inspector and Drawer explain the selected RuntimeObject.
 
 ## Features
 
-- **Agent Runtime lifecycle**: Planner, WorkflowRunner, ToolExecutor, RAG, Memory, Reflection, Evaluation, and Final Answer.
-- **Real Runtime Server**: task creation, task query, cancel, retry, and SSE event streaming.
+- **Agent Runtime lifecycle**: Planner, WorkflowRunner, ToolExecutor, RAG, Evaluation, Reflection, Memory, and Final Answer.
+- **Real Runtime Server**: task creation, task query, cancel, task retry, step-level retry with corrected args, and SSE event streaming.
 - **RuntimeObject model**: one projected object model shared by Chat, Graph, Timeline, Inspector, Drawer, Evidence, Memory, and Evaluation.
-- **Execution Graph**: compact dependency graph for Planner, Workflow, Tool, Knowledge, Memory, Reflection, Evaluation, and Answer.
-- **Debug Timeline**: runtime spans with component, status, duration, retry, token, metadata, input, and output.
-- **Professional Inspector**: object-driven panels for execution, input, output, reasoning, trace, evidence, memory, evaluation, and logs.
-- **Demo path**: one-click demo task plus failure recovery demo for Tool Error -> Retry -> Reflection -> Success.
+- **Execution Graph**: compact dependency graph for Planner, Workflow, Tool, Knowledge, Evaluation, Reflection, Memory, and Answer.
+- **Debug Timeline**: runtime events with component, status, duration, retry, token, metadata, input, and output.
+- **Professional Inspector**: object-driven panels for execution, input, output, reasoning, events, evidence, memory, evaluation, and logs.
+- **Demo path**: one-click happy-path task, plus a real tool failure you can fix and retry at the failed step.
+- **Persistent run history**: tasks and events survive a restart; Dashboard opens a read-only run detail with steps, attempts and the final answer.
+- **Per-run model identity**: each task records the provider/model that served it; the header shows `Mock · 模板` or the real model name.
 
 ## Architecture
 
@@ -56,10 +58,11 @@ flowchart TD
   E --> F[WorkflowRunner]
   F --> G[ToolExecutor + ToolRegistry]
   F --> H[RAG Retriever + Knowledge Base]
-  F --> I[Memory Manager]
-  F --> J[Reflection]
-  J --> K[Evaluator]
-  K --> L[Final Answer]
+  G --> K[Evaluator]
+  H --> K
+  K --> J[Reflection]
+  J --> I[Memory Manager]
+  I --> L[Final Answer]
   D --> M[Trace + Metrics]
   B -->|runtime events| A
   A --> N[RuntimeObject Projection]
@@ -135,13 +138,13 @@ RAG retrieves evidence for the East China sales decline causes and exposes sourc
 
 ### 5. Debug Timeline
 
-The Timeline shows runtime spans, duration, component, status, retry, token, and trace context.
+The Timeline shows runtime events, duration, component, status, retry, token, and task context.
 
 ![Debug Timeline](docs/screenshots/05-debug-timeline.jpg)
 
 ### 6. Runtime Inspector
 
-The selected Final Answer object exposes output, evidence, dependencies, and trace spans.
+The selected Final Answer object exposes output, evidence, dependencies, and the event history.
 
 ![Runtime Inspector](docs/screenshots/06-inspector.jpg)
 
@@ -244,7 +247,7 @@ npm run server
 | 2 | `OPENAI_API_KEY` | baseURL `https://api.openai.com/v1`，model `gpt-4.1-mini` |
 | 3 | 都没有 | Mock 模式 |
 
-`GET /health` 返回当前实际 provider（`deepseek` / `openai` / `mock`），控制台的 `MOCK` 徽标就依据它显示。
+`GET /health` 返回当前实际 provider、model 和可读 label（例如 `Mock · 模板` 或 `DeepSeek · deepseek-chat`）。控制台的顶部 Model 选择器和 `MOCK` 徽标都依据它显示，不再使用占位文案。
 
 ### 密钥安全
 
@@ -321,9 +324,9 @@ Expected demo sequence:
 2. Planner creates executable steps.
 3. ToolExecutor queries sales data and calculates metrics.
 4. RAG retrieves relevant knowledge chunks.
-5. Memory stores working / episodic / semantic context.
-6. Reflection checks whether the answer is complete.
-7. Evaluation scores completeness, accuracy, groundedness, and task completion.
+5. Evaluation scores completeness, accuracy, groundedness, and task completion.
+6. Reflection records whether the run passed the check.
+7. Memory stores working / episodic / semantic context.
 8. Final Answer streams into Chat as Markdown.
 9. Graph, Timeline, Inspector, Drawer, Evidence, Memory, and Evaluation stay synchronized.
 ```
@@ -432,7 +435,25 @@ const llmProvider = realLLMProvider ?? mockLLMProvider
 - prompt 只回放最近 24 条消息（system prompt 始终保留），避免长会话把 token 撑爆。
 - 没带 id 的请求会自动新建会话，行为与之前一致。
 
-### 5 · Runtime 架构
+### 5 · 步骤级重试与 Attempt
+
+失败不是终点，而是一个可操作的状态。
+
+- 任务快照保存 `plan` 与 `steps[]`，每个 step 下记录多次 `attempts[]`：`attemptNo` / `status` / `args` / `error` / 耗时。
+- `POST /api/agent/tasks/:taskId/steps/:stepId/retry` 接收修正后的 `args`，只重跑失败的那一步，然后继续执行后续计划。
+- 恢复时复用原来的 `conversationId`：之前的用户消息、工具调用和失败结果仍在上下文里，后面的 LLM 步骤不会丢失前文。
+- 工具事件带 `stepId` / `attemptNo`，前端能把两次尝试区分开；失败面板可直接编辑参数并重试。
+- 取消同样有明确语义：只有服务端返回 2xx 才提示“已取消”；已完成任务返回 409，控制台刷新真实状态而不是假装取消成功。
+- 控制台默认按真实事件到达时间渲染。旧版的演示配速改为显式 opt-in：只有设置 `VITE_AGENT_DEMO_PACING=true` 才会逐条延迟播放。
+
+### 6 · Run History And Per-run Model
+
+- 任务快照写入 `AGENT_DATA_DIR`（默认 `.data/`）：`tasks.json` 保存任务、计划、步骤、attempts、trace；`events/<taskId>.jsonl` 保存完整事件流。`.data/` 已加入 `.gitignore`。
+- 任务创建时记录本次运行实际使用的 `provider` 与 `model`；`/health` 返回同样的身份信息，顶部 Model 显示 `Mock · 模板` 或 `DeepSeek · deepseek-chat`，不再显示 `Runtime configured` 占位。
+- `GET /api/agent/tasks/:taskId/history` 返回任务快照 + 完整事件；Dashboard 的任务行进入 `/runs/:taskId` 只读详情页（目标、最终答案、步骤与 attempts、事件流、provider/model）。
+- 这是本地 JSON 快照，不是数据库：没有分页、搜索、清理策略，也没有把会话记忆持久化。服务重启后历史可查，但**步骤级重试**仍依赖内存里的原会话；重启后只能整任务重跑。
+
+### 7 · Runtime 架构
 
 monorepo 结构：`apps/`（agent-console、runtime-server）+ `packages/`（agent-runtime、shared-types、shared-utils）。
 
@@ -450,7 +471,7 @@ monorepo 结构：`apps/`（agent-console、runtime-server）+ `packages/`（age
 | `evaluation/` | RuleBasedEvaluator |
 
 `runtime-server` 负责任务生命周期（`task-manager` / `task-store` / `task-repository`）
-与 SSE 事件流（`sse/event-stream.ts`），共 **15 类**运行时事件。
+与 SSE 事件流（`sse/event-stream.ts`），共 **20 类**运行时事件。
 
 ---
 
@@ -470,6 +491,11 @@ Implemented:
 - Runtime Server with task lifecycle
 - SSE event streaming
 - Task cancel and retry
+- Step-level retry with corrected tool args and per-step attempts
+- Live `state_update` events and step-based progress
+- Cancel confirmation that only reports success after a 2xx response
+- Persistent task/event history (local JSON/JSONL) and a read-only run detail page
+- Per-run provider/model recorded on the task
 - React Runtime Studio
 - RuntimeObject projection for Graph / Timeline / Inspector / Drawer
 - Dashboard, Knowledge, Memory, Evaluation, Workflow, and Settings pages for demonstration

@@ -1,4 +1,4 @@
-export { Agent } from './agent/agent';
+export { Agent, RetryContextUnavailableError } from './agent/agent';
 export { ConversationManager } from './agent/conversation';
 export { EventEmitter } from './agent/event';
 export { Planner } from './planner/planner';

@@ -1,17 +1,18 @@
 import { FormEvent, useRef, useState, type KeyboardEvent } from 'react';
 import { PlayIcon, StopIcon } from '@console/components/ui';
-import { getRuntimeModelLabel } from '../../features/agent-console/runtime-overview';
+import { useRuntimeModelLabel } from '../../features/agent-console/runtime-overview';
+import { useAgentStore } from '../../store/agentStore';
 
 interface InputBoxProps {
   disabled?: boolean;
   onSubmit: (value: string) => void;
   onStop?: () => void;
   onRegenerate?: () => void;
-  /** Provider reported by the server health check, e.g. "mock" or "openai". */
-  runtimeProvider?: string;
 }
 
-export function InputBox({ disabled, onSubmit, onStop, onRegenerate, runtimeProvider }: InputBoxProps) {
+export function InputBox({ disabled, onSubmit, onStop, onRegenerate }: InputBoxProps) {
+  const runtimeProvider = useAgentStore((state) => state.runtimeProvider);
+  const modelLabel = useRuntimeModelLabel();
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -106,7 +107,7 @@ export function InputBox({ disabled, onSubmit, onStop, onRegenerate, runtimeProv
         <div className="flex items-center gap-1.5">
           <span className="text-[9px] text-muted">Model</span>
           <span className="inline-flex h-5 items-center gap-1 rounded border border-line bg-white px-1.5 text-[10px] font-medium text-ink">
-            <span>{getRuntimeModelLabel()}</span>
+            <span>{modelLabel}</span>
           </span>
         </div>
       </div>

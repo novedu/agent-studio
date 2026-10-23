@@ -13,7 +13,7 @@ import {
 import { classNames } from '@console/components/ui/classNames';
 import {
   getRuntimeEnvironmentLabel,
-  getRuntimeModelLabel,
+  useRuntimeModelLabel,
 } from '@console/features/agent-console/runtime-overview';
 import { checkAgentServerHealth, getAgentServerURL } from '@console/services/agent';
 import { useAgentStore } from '@console/store/agentStore';
@@ -111,7 +111,7 @@ export function Settings() {
   const evaluation = useAgentStore((state) => state.evaluation);
   const serverUrl = getSafeAgentServerURL();
   const envLabel = getRuntimeEnvironmentLabel();
-  const modelLabel = getRuntimeModelLabel();
+  const modelLabel = useRuntimeModelLabel();
   const [health, setHealth] = useState<RuntimeHealthState>({ status: 'checking' });
   const refreshHealth = useCallback(async () => {
     if (serverUrl === 'not configured') {

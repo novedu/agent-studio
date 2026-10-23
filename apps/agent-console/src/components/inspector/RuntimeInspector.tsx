@@ -236,8 +236,8 @@ function buildObjectSections({
 }: Omit<RuntimeObjectInspectorProps, 'nodeCount' | 'defaultOpen'>) {
   const sharedTraceSection = {
     id: 'trace',
-    title: 'Trace Spans',
-    meta: <Badge>{events.length} spans</Badge>,
+    title: 'Runtime Events',
+    meta: <Badge>{events.length} events</Badge>,
     children: (
       <TraceExplorer
         events={events}
@@ -315,6 +315,14 @@ function buildObjectSections({
           ]}
         />
       )),
+      section(
+        'attempts',
+        'Attempts',
+        <Badge tone={object.retryCount ? 'warning' : 'neutral'}>
+          {readAttemptCount(object)} attempt{readAttemptCount(object) === 1 ? '' : 's'}
+        </Badge>,
+        <JsonViewer title="Step Attempts" value={object.metadata?.attempts ?? []} />,
+      ),
       dependencySection,
       sharedTraceSection,
       logsSection,
@@ -587,6 +595,11 @@ function truncate(value: string, maxLength: number): string {
 
 function shortId(value: string): string {
   return value.length > 18 ? value.slice(-18) : value;
+}
+
+function readAttemptCount(object: RuntimeInspectorProps['runtimeObjects'][number]): number {
+  const attempts = object.metadata?.attempts;
+  return Array.isArray(attempts) && attempts.length > 0 ? attempts.length : 1;
 }
 
 function getDefaultOpenSection(focusType?: string, focusSection?: string): string {

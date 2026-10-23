@@ -128,13 +128,15 @@ function EvaluationHeader({
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
             Evaluation Platform
           </div>
+          <Badge tone="neutral">Rule-based</Badge>
           <Badge tone={evaluation ? getScoreTone(evaluation.score) : run.status === 'running' ? 'info' : 'neutral'}>
             {evaluation ? `${Math.round(evaluation.score * 100)} score` : run.status}
           </Badge>
         </div>
         <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink">Evaluation Center</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Review answer quality, scoring criteria, feedback, and runtime evidence from the current Agent run.
+          Heuristic rule scoring (structure, tool success, RAG evidence, completion) — not an LLM judge.
+          Review criteria, feedback, and runtime evidence from the current Agent run.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted">
           <span>current session only</span>

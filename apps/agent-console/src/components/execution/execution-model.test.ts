@@ -51,6 +51,7 @@ describe('Execution model', () => {
       {
         id: 'task_timeline_1_querySalesData',
         name: 'querySalesData',
+        attemptNo: 2,
         args: { region: 'East China' },
         result: { rows: 24 },
         status: 'success',

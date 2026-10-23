@@ -288,14 +288,18 @@ function getColumn(type: RuntimeObjectType): number {
   if (type === 'planner') return 0;
   if (type === 'workflow' || type === 'knowledge') return 1;
   if (type === 'tool') return 2;
-  if (type === 'memory' || type === 'reflection') return 3;
-  if (type === 'evaluation') return 4;
+  // The runtime now runs evaluation before reflection and memory, so the graph
+  // must use the same left-to-right order instead of drawing backward edges.
+  if (type === 'evaluation') return 3;
+  if (type === 'memory' || type === 'reflection') return 4;
   return 5;
 }
 
 function getBaseY(type: RuntimeObjectType): number {
-  if (type === 'workflow' || type === 'memory') return 16;
-  if (type === 'knowledge' || type === 'reflection') return 120;
+  // Reflection reads the evaluation and writes memory, so keep that chain
+  // readable top-to-bottom inside the shared column.
+  if (type === 'workflow' || type === 'reflection') return 16;
+  if (type === 'knowledge' || type === 'memory') return 120;
   if (type === 'planner') return 68;
   if (type === 'evaluation' || type === 'answer') return 68;
   return 68;

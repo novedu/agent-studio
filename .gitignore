@@ -17,3 +17,6 @@ apps/agent-console/vite.config.d.ts
 apps/agent-console/vitest.config.js
 apps/agent-console/vitest.config.d.ts
 !**/.env.example
+
+# Local run history (tasks.json + events/*.jsonl)
+.data/

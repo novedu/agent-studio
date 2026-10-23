@@ -247,7 +247,7 @@ Navigation must feel like a linked runtime debugger, not separate panels.
 ```text
 Citation → Knowledge chunk
 Memory → Chat message
-Evaluation → Trace span
+Evaluation → Runtime event
 Trace → Graph / Timeline / Drawer
 ```
 

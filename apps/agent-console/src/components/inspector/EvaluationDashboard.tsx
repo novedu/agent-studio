@@ -41,6 +41,7 @@ export function EvaluationDashboard({
           <div className="mt-1 text-3xl font-semibold text-ink">
             {Math.round(evaluation.score * 100)}
           </div>
+          <div className="mt-0.5 text-[9px] text-muted">Rule-based heuristic, not an LLM judge</div>
         </div>
         <Badge tone={evaluation.score >= 0.8 ? 'success' : 'warning'}>
           {evaluation.score >= 0.8 ? 'Strong' : 'Review'}

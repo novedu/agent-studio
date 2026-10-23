@@ -46,6 +46,10 @@ export interface WorkflowEvent {
 export interface ToolCallRecord {
   id: string;
   name: string;
+  /** Plan step this call belongs to (set by the runtime event). */
+  stepId?: string;
+  /** 1-based attempt number; a retried step produces a new record. */
+  attemptNo?: number;
   args: Record<string, unknown>;
   result?: unknown;
   status: StepStatus;
@@ -72,7 +76,7 @@ export interface AgentStateSnapshot {
   goal: string;
   currentStepId?: string;
   completedStepIds: string[];
-  status: 'idle' | 'planning' | 'running' | 'success' | 'failed';
+  status: 'idle' | 'planning' | 'running' | 'success' | 'failed' | 'cancelled';
   error?: string;
 }
 

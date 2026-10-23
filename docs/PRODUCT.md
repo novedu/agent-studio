@@ -32,7 +32,7 @@ Modern AI applications require far more than a conversational interface.
 
 Developers need to understand the complete runtime lifecycle of an AI agent:
 
-Planning → Execution → Knowledge Retrieval → Memory → Reflection → Evaluation
+Planning → Execution → Knowledge Retrieval → Evaluation → Reflection → Memory
 
 Agent Studio provides a single engineering workspace where every runtime decision is observable, explainable, and debuggable.
 
@@ -210,13 +210,13 @@ Execution
 Knowledge Retrieval
     │
     ▼
-Memory Update
+Evaluation
     │
     ▼
 Reflection
     │
     ▼
-Evaluation
+Memory Update
     │
     ▼
 Completed
@@ -225,16 +225,19 @@ Completed
 Failure paths:
 
 ```text
-Execution
+Execution (tool fails)
       │
       ▼
 Failed
       │
-Retry
+Step Retry (corrected args)
       │
       ▼
-Execution
+Resume at the failed step → continue remaining steps
 ```
+
+A full task retry restarts the plan from the beginning; a step retry
+re-runs only the failed step and keeps completed steps and conversation context.
 
 or
 

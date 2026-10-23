@@ -82,7 +82,7 @@ describe('RuntimeObject projection', () => {
     expect(reflection).toMatchObject({
       status: 'running',
       lifecycle: 'running',
-      dependencyIds: ['rag', 'memory', 'tool:querySales'],
+      dependencyIds: ['evaluation'],
     });
     expect(tool?.span.eventCount).toBe(0);
     expect(getCurrentRuntimeObjectId(objects)).toBe('reflection');
@@ -105,9 +105,11 @@ describe('RuntimeObject projection', () => {
 
     expect(edgeIds).toContain('planner__workflow');
     expect(edgeIds).toContain('workflow__tool:querySales');
-    expect(edgeIds).toContain('tool:querySales__memory');
-    expect(edgeIds).toContain('reflection__evaluation');
-    expect(edgeIds).toContain('evaluation__answer');
+    expect(edgeIds).toContain('tool:querySales__evaluation');
+    expect(edgeIds).toContain('rag__evaluation');
+    expect(edgeIds).toContain('evaluation__reflection');
+    expect(edgeIds).toContain('reflection__memory');
+    expect(edgeIds).toContain('memory__answer');
     expect(edges.every((edge) => edge.status === 'success')).toBe(true);
   });
 });

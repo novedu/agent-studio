@@ -21,7 +21,7 @@ import {
 import { getLLMProviderName, resolveLLMConfig } from '../env';
 import { defaultUserContext, type ToolSecurityEventType, type UserContext } from '@shared-types/security';
 import type { EvaluationContext, TraceRecord } from '@shared-types/trace';
-import type { AgentEvent, AgentTrace, LLMResponse, Plan, ToolResult } from '@shared-types/agent';
+import type { AgentEvent, AgentStateSnapshot, AgentTrace, LLMResponse, Plan, ToolResult } from '@shared-types/agent';
 import type {
   AgentRuntimePort,
   AgentServerEvent,
@@ -74,7 +74,10 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
     const observabilityTrace = this.traceManager.startTrace(context.taskId, {
       input: context.input,
     });
-    const eventFactory = createServerEventFactory(context.taskId);
+    const eventFactory = createServerEventFactory(
+      context.taskId,
+      context.resume?.attemptNo ?? context.attemptNo ?? 1,
+    );
     let plannerSpan: ReturnType<TraceManager['startSpan']> | undefined;
     const plannerHooks: PlannerRuntimeHooks = {
       onPlanStarted: (input) => {
@@ -107,27 +110,46 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
       },
     };
     const bundle = this.getOrCreateBundle(context.conversationId, plannerHooks, context.userContext);
-    let finalAnswerStreamed = false;
 
-    emitIfActive(context, eventFactory('plan_start', {
-      input: context.input,
-    }));
+    // A resumed run already has a plan; replaying plan_start would make the UI
+    // look like the task restarted from scratch.
+    if (!context.resume) {
+      emitIfActive(context, eventFactory('plan_start', {
+        input: context.input,
+      }));
+    }
 
-    this.bindRuntimeEvents(bundle.eventEmitter, context, eventFactory, {
+    const unbindRuntimeEvents = this.bindRuntimeEvents(bundle.eventEmitter, context, eventFactory, {
       traceId: observabilityTrace.traceId,
-      markFinalAnswerStreamed: () => {
-        finalAnswerStreamed = true;
-      },
     });
+
+    const emitState = (snapshot: AgentStateSnapshot): void => {
+      emitIfActive(context, eventFactory('state_update', {
+        status: toTaskStatus(snapshot.status),
+        currentStep: snapshot.currentStepId,
+        completedStepIds: snapshot.completedStepIds,
+        progress: calculateProgress(snapshot.completedStepIds.length, snapshot.steps.length),
+      } satisfies StateUpdatePayload));
+    };
 
     const workflowSpan = this.traceManager.startSpan({
       traceId: observabilityTrace.traceId,
       taskId: context.taskId,
       component: 'WorkflowRunner',
     });
-    const trace = await bundle.agent.run(context.input, {
-      conversationId: context.conversationId,
-    });
+    const trace = await (async () => {
+      try {
+        return await bundle.agent.run(context.input, {
+          conversationId: context.conversationId,
+          resume: context.resume,
+          onStateChange: emitState,
+        });
+      } finally {
+        // The bundle is cached per conversation; without cleanup a step retry
+        // would bind a second set of listeners and duplicate every SSE event.
+        unbindRuntimeEvents();
+      }
+    })();
     this.rememberBundle(trace.conversationId, bundle);
     this.traceManager.recordSpan(workflowSpan.end(trace.success ? 'success' : 'failed', {
       runtimeTaskId: trace.taskId,
@@ -135,29 +157,27 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
     }));
     assertNotAborted(context.signal);
 
-    trace.stateHistory?.forEach((snapshot) => {
-      emitIfActive(context, eventFactory('state_update', {
-        status: snapshot.status === 'completed'
-          ? 'completed'
-          : snapshot.status === 'failed'
-            ? 'failed'
-            : 'running',
-        currentStep: snapshot.currentStepId,
-        completedStepIds: snapshot.completedStepIds,
-        progress: calculateProgress(snapshot.completedStepIds.length, snapshot.steps.length),
-      } satisfies StateUpdatePayload));
-    });
-
-    if (trace.finalAnswer && !finalAnswerStreamed) {
-      streamFinalAnswer(trace.finalAnswer, (payload) => {
-        emitIfActive(context, eventFactory('final_answer', payload));
+    // Failure is a first-class outcome: no quality score, no memory write and no
+    // answer. The user gets a failed reflection plus the tool error instead.
+    if (!trace.success) {
+      const reflectionSpan = this.traceManager.startSpan({
+        traceId: observabilityTrace.traceId,
+        taskId: context.taskId,
+        component: 'Reflection',
+        metadata: { failed: true },
       });
-    }
+      emitIfActive(context, eventFactory('reflection', {
+        status: 'failed',
+        message: trace.error || '任务执行失败，需要人工检查。',
+      } satisfies ReflectionPayload));
+      this.traceManager.recordSpan(reflectionSpan.end('failed'));
 
-    emitIfActive(context, eventFactory('final_answer', {
-      content: trace.finalAnswer,
-      done: true,
-    } satisfies FinalAnswerPayload));
+      const failedTrace = this.traceManager.endTrace(observabilityTrace.traceId, 'failed', {
+        error: trace.error,
+      });
+      if (failedTrace) this.metrics.recordTrace(failedTrace);
+      return trace;
+    }
 
     emitIfActive(context, eventFactory('evaluation_start', {
       traceId: observabilityTrace.traceId,
@@ -187,6 +207,18 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
       feedback: evaluation.feedback,
     } satisfies EvaluationCompletePayload));
 
+    const reflectionSpan = this.traceManager.startSpan({
+      traceId: observabilityTrace.traceId,
+      taskId: context.taskId,
+      component: 'Reflection',
+      metadata: { evaluationScore: evaluation.score },
+    });
+    emitIfActive(context, eventFactory('reflection', {
+      status: evaluation.score >= 0.7 ? 'passed' : 'needs_replanning',
+      message: `评估分数 ${evaluation.score}，${evaluation.feedback.join(' ')}`,
+    } satisfies ReflectionPayload));
+    this.traceManager.recordSpan(reflectionSpan.end('success'));
+
     const memoryItems = bundle.memoryManager.list();
     if (memoryItems.length > 0) {
       const memorySpan = this.traceManager.startSpan({
@@ -207,23 +239,21 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
       this.traceManager.recordSpan(memorySpan.end('success'));
     }
 
-    const reflectionSpan = this.traceManager.startSpan({
-      traceId: observabilityTrace.traceId,
-      taskId: context.taskId,
-      component: 'Reflection',
-      metadata: { evaluationScore: evaluation.score },
-    });
-    emitIfActive(context, eventFactory('reflection', {
-      status: trace.success && evaluation.score >= 0.7 ? 'passed' : 'needs_replanning',
-      message: trace.success
-        ? `评估分数 ${evaluation.score}，${evaluation.feedback.join(' ')}`
-        : trace.error || '任务执行失败，需要人工检查。',
-    } satisfies ReflectionPayload));
-    this.traceManager.recordSpan(reflectionSpan.end(trace.success ? 'success' : 'failed'));
+    // The answer is delivered last, after the post-run checks, so the visible
+    // event order matches the UI narrative: evaluation -> reflection -> memory -> answer.
+    if (trace.finalAnswer) {
+      streamFinalAnswer(trace.finalAnswer, (payload) => {
+        emitIfActive(context, eventFactory('final_answer', payload));
+      });
+    }
+    emitIfActive(context, eventFactory('final_answer', {
+      content: trace.finalAnswer,
+      done: true,
+    } satisfies FinalAnswerPayload));
 
     const completedObservabilityTrace = this.traceManager.endTrace(
       observabilityTrace.traceId,
-      trace.success ? 'success' : 'failed',
+      'success',
       { evaluationScore: evaluation.score },
     );
     if (completedObservabilityTrace) {
@@ -238,11 +268,16 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
     eventEmitter: EventEmitter,
     context: RuntimeTaskContext,
     eventFactory: ReturnType<typeof createServerEventFactory>,
-    options: { traceId: string; markFinalAnswerStreamed: () => void },
-  ): void {
+    options: { traceId: string },
+  ): () => void {
     const activeSpans = new Map<string, ReturnType<TraceManager['startSpan']>>();
+    const removers: Array<() => void> = [];
+    const add = (type: AgentEvent['type'], handler: (event: AgentEvent) => void): void => {
+      eventEmitter.on(type, handler);
+      removers.push(() => eventEmitter.off(type, handler));
+    };
 
-    eventEmitter.on('llm_start', (event) => {
+    add('llm_start', (event) => {
       const runtimeEvent = event as Extract<AgentEvent, { type: 'llm_start' }>;
       const llmSpan = this.traceManager.startSpan({
         traceId: options.traceId,
@@ -258,7 +293,7 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
       activeSpans.set(`llm:${runtimeEvent.messageId}`, llmSpan);
     });
 
-    eventEmitter.on('tool_start', (event) => {
+    add('tool_start', (event) => {
       const runtimeEvent = event as Extract<AgentEvent, { type: 'tool_start' }>;
       const toolSpan = this.traceManager.startSpan({
         traceId: options.traceId,
@@ -267,26 +302,30 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
         stepId: runtimeEvent.toolName,
         metadata: { args: runtimeEvent.args },
       });
-      activeSpans.set(`tool:${runtimeEvent.toolName}`, toolSpan);
+      activeSpans.set(toolSpanKey(runtimeEvent), toolSpan);
       emitIfActive(context, eventFactory('tool_start', {
         toolName: runtimeEvent.toolName,
         args: runtimeEvent.args,
+        stepId: runtimeEvent.stepId,
+        attemptNo: runtimeEvent.attemptNo,
       }));
     });
 
-    eventEmitter.on('tool_success', (event) => {
+    add('tool_success', (event) => {
       const runtimeEvent = event as Extract<AgentEvent, { type: 'tool_success' }>;
-      const toolSpan = activeSpans.get(`tool:${runtimeEvent.toolName}`);
+      const toolSpan = activeSpans.get(toolSpanKey(runtimeEvent));
       if (toolSpan) {
         this.traceManager.recordSpan(toolSpan.end('success', {
           duration: runtimeEvent.result.duration,
           success: runtimeEvent.result.success,
         }));
-        activeSpans.delete(`tool:${runtimeEvent.toolName}`);
+        activeSpans.delete(toolSpanKey(runtimeEvent));
       }
       emitIfActive(context, eventFactory('tool_success', {
         toolName: runtimeEvent.toolName,
         result: runtimeEvent.result,
+        stepId: runtimeEvent.stepId,
+        attemptNo: runtimeEvent.attemptNo,
       }));
 
       const ragPayload = toRagRetrievePayload(runtimeEvent.result);
@@ -308,18 +347,20 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
       }
     });
 
-    eventEmitter.on('tool_error', (event) => {
+    add('tool_error', (event) => {
       const runtimeEvent = event as Extract<AgentEvent, { type: 'tool_error' }>;
-      const toolSpan = activeSpans.get(`tool:${runtimeEvent.toolName}`);
+      const toolSpan = activeSpans.get(toolSpanKey(runtimeEvent));
       if (toolSpan) {
         this.traceManager.recordSpan(toolSpan.end('failed', {
           error: runtimeEvent.error.message,
         }));
-        activeSpans.delete(`tool:${runtimeEvent.toolName}`);
+        activeSpans.delete(toolSpanKey(runtimeEvent));
       }
       emitIfActive(context, eventFactory('tool_error', {
         toolName: runtimeEvent.toolName,
         error: runtimeEvent.error,
+        stepId: runtimeEvent.stepId,
+        attemptNo: runtimeEvent.attemptNo,
       }));
     });
 
@@ -334,11 +375,11 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
       } satisfies ToolSecurityPayload));
     };
 
-    eventEmitter.on('permission_denied', emitSecurityEvent);
-    eventEmitter.on('tool_blocked', emitSecurityEvent);
-    eventEmitter.on('approval_required', emitSecurityEvent);
+    add('permission_denied', emitSecurityEvent);
+    add('tool_blocked', emitSecurityEvent);
+    add('approval_required', emitSecurityEvent);
 
-    eventEmitter.on('llm_response', (event) => {
+    add('llm_response', (event) => {
       const runtimeEvent = event as Extract<AgentEvent, { type: 'llm_response' }>;
       const llmSpan = activeSpans.get(`llm:${runtimeEvent.messageId}`);
       if (llmSpan) {
@@ -348,15 +389,11 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
         }));
         activeSpans.delete(`llm:${runtimeEvent.messageId}`);
       }
-      if (!runtimeEvent.response.done || !runtimeEvent.response.content) return;
-
-      options.markFinalAnswerStreamed();
-      streamFinalAnswer(runtimeEvent.response.content, (payload) => {
-        emitIfActive(context, eventFactory('final_answer', payload));
-      });
+      // The final answer is streamed after evaluation/reflection/memory so the
+      // visible order is the same everywhere. This handler only closes the span.
     });
 
-    eventEmitter.on('llm_error', (event) => {
+    add('llm_error', (event) => {
       const runtimeEvent = event as Extract<AgentEvent, { type: 'llm_error' }>;
       const llmSpan = activeSpans.get(`llm:${runtimeEvent.messageId}`);
       if (llmSpan) {
@@ -367,6 +404,10 @@ export class AgentRuntimeAdapter implements AgentRuntimePort {
         activeSpans.delete(`llm:${runtimeEvent.messageId}`);
       }
     });
+
+    return () => {
+      removers.forEach((remove) => remove());
+    };
   }
 
   private getOrCreateBundle(
@@ -524,13 +565,15 @@ function createDefaultLLMProvider(): LLMProvider {
   return new MockLLMProvider({ responses: mockResponses, delayMs: 200 });
 }
 
-function createServerEventFactory(taskId: string) {
+function createServerEventFactory(taskId: string, attemptNo = 1) {
   let index = 0;
 
   return <TPayload>(type: AgentServerEvent<TPayload>['type'], payload: TPayload): AgentServerEvent<TPayload> => {
     index += 1;
     return {
-      id: `${taskId}_event_${String(index).padStart(4, '0')}`,
+      // Include the attempt so a retry cannot reuse ids from the previous run;
+      // the SSE ?after cursor relies on ids being unique per task.
+      id: `${taskId}_a${attemptNo}_event_${String(index).padStart(4, '0')}`,
       taskId,
       type,
       timestamp: Date.now(),
@@ -641,7 +684,17 @@ function buildEvaluationContext(
 
 function calculateProgress(completed: number, total: number): number {
   if (total <= 0) return 0;
-  return Math.round((completed / total) * 100);
+  return Math.min(100, Math.round((completed / total) * 100));
+}
+
+function toTaskStatus(status: AgentStateSnapshot['status']): 'running' | 'completed' | 'failed' {
+  if (status === 'completed') return 'completed';
+  if (status === 'failed') return 'failed';
+  return 'running';
+}
+
+function toolSpanKey(event: { toolName: string; stepId?: string; attemptNo?: number }): string {
+  return `tool:${event.stepId ?? event.toolName}:${event.attemptNo ?? 1}`;
 }
 
 function emitIfActive(context: RuntimeTaskContext, event: AgentServerEvent): void {

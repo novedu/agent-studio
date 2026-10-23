@@ -1,6 +1,27 @@
+## Unreleased - Persistent runs, real model identity and honest labels
+
+- Tasks are persisted to `.data/tasks.json` and events to `.data/events/<taskId>.jsonl` (override with `AGENT_DATA_DIR`). Finished runs survive a server restart.
+- Added `GET /api/agent/tasks/:taskId/history` and a read-only `/runs/:taskId` detail page (goal, final answer, steps/attempts, event history, provider/model). Dashboard task rows open this page instead of the live console.
+- `/health` now returns `model` and a human-readable `label`; the console header and input show `Mock · 模板` or `DeepSeek · deepseek-chat` instead of `Runtime configured`.
+- Each task records the provider/model that served it; the Dashboard row and run detail show it.
+- Renamed "Trace Spans" to "Runtime Events" in the Inspector, Timeline and Step detail. The UI no longer implies distributed tracing.
+- Evaluation surfaces are explicitly labelled "Rule-based" / "not an LLM judge".
+- Added `persistence-test.ts` (task repository + event history + `after` replay across reloads).
+
 # Changelog
 
 All notable Agent Studio changes will be documented here.
+
+## Unreleased - Real failure, step retry, live state and honest cancel
+
+- Removed the client-side fake "Failure -> Retry" replay. The demo now creates a real server task whose planner calls `querySalesData` with an unsupported region, producing a real `tool_error`.
+- Added step-level retry: `POST /api/agent/tasks/:taskId/steps/:stepId/retry` accepts corrected `args`, resumes at the failed step, reuses the original conversation, and continues the remaining plan.
+- Task records now keep `plan` + `steps[]` + per-step `attempts[]` (`attemptNo`, `status`, `args`, `error`, duration). Tool events carry `stepId` / `attemptNo`.
+- `state_update` is emitted live from `AgentState`; progress is `completedStepIds / total steps`, not a count of event names.
+- Cancel is honest: the console only reports cancellation after a 2xx, refreshes the real state on 409, keeps progress, and no longer maps cancellation to an error.
+- The visible order is now Evaluation → Reflection → Memory → Answer; graph nodes, dependency edges and docs follow the same order.
+- SSE supports `?after=<eventId>` so a step retry does not replay the previous attempt's events.
+- Added `step-retry-test.ts` plus store and failure-panel tests covering the retry and cancel paths.
 
 ## Unreleased - Real model provider and secret scanning
 

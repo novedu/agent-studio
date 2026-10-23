@@ -2,17 +2,17 @@ import { Panel } from '../ui';
 
 interface ExecutionGraphEmptyStateProps {
   onStart: () => void;
-  onStartRetryDemo?: () => void;
+  onStartFailureDemo?: () => void;
 }
 
-export function ExecutionGraphEmptyState({ onStart, onStartRetryDemo }: ExecutionGraphEmptyStateProps) {
+export function ExecutionGraphEmptyState({ onStart, onStartFailureDemo }: ExecutionGraphEmptyStateProps) {
   const nodes = [
     { label: 'Planner', detail: 'plan', color: 'border-blue-200 bg-blue-50 text-blue-700' },
     { label: 'Tool', detail: 'execute', color: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
     { label: 'Knowledge', detail: 'retrieve', color: 'border-amber-200 bg-amber-50 text-amber-700' },
-    { label: 'Memory', detail: 'write', color: 'border-purple-200 bg-purple-50 text-purple-700' },
-    { label: 'Reflection', detail: 'check', color: 'border-blue-200 bg-blue-50 text-blue-700' },
     { label: 'Evaluation', detail: 'score', color: 'border-slate-300 bg-white text-slate-700' },
+    { label: 'Reflection', detail: 'check', color: 'border-blue-200 bg-blue-50 text-blue-700' },
+    { label: 'Memory', detail: 'write', color: 'border-purple-200 bg-purple-50 text-purple-700' },
     { label: 'Answer', detail: 'stream', color: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
   ];
 
@@ -76,21 +76,21 @@ export function ExecutionGraphEmptyState({ onStart, onStartRetryDemo }: Executio
             <span className="line-clamp-2">Chat streams the answer and runtime evidence.</span>
           </div>
           <div className="rounded-md border border-line bg-panel px-3 py-2">
-            <span className="line-clamp-2">Timeline appends spans as runtime events arrive.</span>
+            <span className="line-clamp-2">Timeline appends events as runtime events arrive.</span>
           </div>
           <div className="rounded-md border border-line bg-panel px-3 py-2">
             <span className="line-clamp-2">Drawer, Inspector, Graph and Chat share selection.</span>
           </div>
         </div>
 
-        {onStartRetryDemo && (
+        {onStartFailureDemo && (
           <button
             type="button"
-            onClick={onStartRetryDemo}
+            onClick={onStartFailureDemo}
             className="inline-flex h-7 w-fit cursor-pointer items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 text-[10px] font-semibold text-amber-700 transition-colors duration-200 hover:bg-amber-100"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-current" />
-            {'Run Tool Error -> Retry -> Success'}
+            {'Run tool failure -> step retry'}
           </button>
         )}
       </div>

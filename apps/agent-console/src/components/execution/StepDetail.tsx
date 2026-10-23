@@ -15,7 +15,7 @@ const tabs: Array<{ id: StepTab; label: string }> = [
   { id: 'input', label: 'Input' },
   { id: 'output', label: 'Output' },
   { id: 'reasoning', label: 'Reasoning' },
-  { id: 'trace', label: 'Trace' },
+  { id: 'trace', label: 'Events' },
   { id: 'metadata', label: 'Metadata' },
   { id: 'raw', label: 'Raw JSON' },
 ];
@@ -80,7 +80,7 @@ export function StepDetail({ object }: StepDetailProps) {
       {activeTab === 'reasoning' && <SmartBlock title="Reasoning Summary" value={getReasoning(object)} />}
       {activeTab === 'trace' && (
         <JsonViewer
-          title="Trace Span"
+          title="Runtime Events"
           value={{
             traceId: object.traceId,
             spanId: object.spanId,

@@ -26,6 +26,13 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: 'runs/:taskId',
+        lazy: async () => {
+          const { RunDetail } = await import('../pages/RunDetail');
+          return { Component: RunDetail };
+        },
+      },
+      {
         path: 'workflow',
         lazy: async () => {
           const { Workflow } = await import('../pages/Workflow');

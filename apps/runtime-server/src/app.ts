@@ -3,6 +3,8 @@ import { TaskManager } from './task/task-manager';
 import type { TaskRepository } from './task/task-repository';
 import { InMemoryTaskRepository } from './task/task-store';
 import type { AgentEventSink, AgentRuntimePort, AgentServerEvent } from '@shared-types/api';
+import { getRuntimeModelInfo, type RuntimeModelInfo } from './env';
+import type { EventHistoryStorage } from './sse/event-history';
 
 export interface AgentServerApp {
   routes: typeof agentRoutes;
@@ -16,6 +18,8 @@ export interface CreateAgentServerAppOptions {
   runtime: AgentRuntimePort;
   taskRepository?: TaskRepository;
   eventHub?: AgentEventHub;
+  /** Describes the model that actually serves new tasks (mock vs real). */
+  runtimeInfo?: () => RuntimeModelInfo;
 }
 
 export function createAgentServerApp(options: CreateAgentServerAppOptions): AgentServerApp {
@@ -25,6 +29,7 @@ export function createAgentServerApp(options: CreateAgentServerAppOptions): Agen
     repository: taskRepository,
     runtime: options.runtime,
     publishEvent: eventHub.publish,
+    runtimeInfo: options.runtimeInfo ?? getRuntimeModelInfo,
   });
 
   return {
@@ -39,15 +44,16 @@ export function createAgentServerApp(options: CreateAgentServerAppOptions): Agen
   };
 }
 
-export function createInMemoryAgentEventHub(): AgentEventHub {
+export function createInMemoryAgentEventHub(storage?: EventHistoryStorage): AgentEventHub {
   const listeners = new Map<string, Set<AgentEventSink>>();
-  const history = new Map<string, AgentServerEvent[]>();
+  const history = storage?.load() ?? new Map<string, AgentServerEvent[]>();
 
   return {
     publish: (event: AgentServerEvent) => {
       const taskHistory = history.get(event.taskId) ?? [];
       taskHistory.push(event);
       history.set(event.taskId, taskHistory);
+      storage?.append(event);
 
       const taskListeners = listeners.get(event.taskId);
       if (!taskListeners) return;
@@ -55,12 +61,21 @@ export function createInMemoryAgentEventHub(): AgentEventHub {
       taskListeners.forEach((listener) => listener(event));
     },
 
-    subscribe: (taskId, listener) => {
+    getHistory: (taskId) => [...(history.get(taskId) ?? [])],
+
+    subscribe: (taskId, listener, afterEventId) => {
       const taskListeners = listeners.get(taskId) ?? new Set<AgentEventSink>();
       taskListeners.add(listener);
       listeners.set(taskId, taskListeners);
       queueMicrotask(() => {
-        history.get(taskId)?.forEach((event) => {
+        const taskHistory = history.get(taskId) ?? [];
+        const cursor = afterEventId
+          ? taskHistory.findIndex((event) => event.id === afterEventId)
+          : -1;
+        // Replay only what this subscriber has not seen. A missing cursor means
+        // the history was evicted or the client is new, so replay everything.
+        const replay = cursor >= 0 ? taskHistory.slice(cursor + 1) : taskHistory;
+        replay.forEach((event) => {
           if (listeners.get(taskId)?.has(listener)) {
             listener(event);
           }

@@ -12,6 +12,7 @@ const PLANNER_MARKER = '你是一个任务规划器';
 const SALES_PATTERN = /销售|下降|华东|报告|复盘|分析/;
 const GREETING_PATTERN = /^(你好|您好|hi\b|hello|嗨|在吗|hey)/i;
 const CAPABILITY_PATTERN = /能做什么|做什么|你是谁|这是什么|介绍一下|怎么用|help|功能/i;
+const FAILURE_DEMO_PATTERN = /工具失败|失败重试|异常演示|预检.*重试|tool[-_ ]?error/i;
 const MAX_ECHO_LENGTH = 80;
 
 /**
@@ -64,6 +65,42 @@ export class MockLLMProvider implements LLMProvider {
     const userMessage = messages.find(message => message.role === 'user');
     const userPayload = this.parseUserPayload(userMessage?.content ?? '');
     const goal = userPayload.goal || '未命名任务';
+
+    // Deterministic failure path for the real (non-fake) failure demo:
+    // region 华中 is intentionally unsupported, so querySalesData fails for real.
+    if (FAILURE_DEMO_PATTERN.test(goal)) {
+      return {
+        content: JSON.stringify({
+          goal,
+          steps: [
+            {
+              id: '1',
+              tool: 'querySalesData',
+              description: '预检华中区域销售数据源',
+              args: { region: '华中', month: '2024-02' },
+            },
+            {
+              id: '2',
+              tool: 'calculateMetrics',
+              description: '计算华东区域销售增长率',
+              args: { current: 980000, previous: 1250000, metric: 'growth' },
+            },
+            {
+              id: '3',
+              tool: 'searchKnowledge',
+              description: '检索销售下降原因和渠道证据',
+              args: { query: '华东 销售下降 渠道 原因', limit: 3 },
+            },
+            {
+              id: '4',
+              tool: 'llm',
+              description: '生成失败恢复后的分析报告',
+            },
+          ],
+        }),
+        done: true,
+      };
+    }
 
     if (SALES_PATTERN.test(goal)) {
       return {

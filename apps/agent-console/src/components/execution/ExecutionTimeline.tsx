@@ -63,7 +63,7 @@ export function ExecutionTimeline({
   return (
     <Panel
       title="Debug Timeline"
-      description={flowObjects.length ? 'Trace spans from runtime objects' : 'Runtime flow preview'}
+      description={flowObjects.length ? 'Runtime events projected from objects' : 'Runtime flow preview'}
       className="h-full rounded-none border-0 shadow-none"
       bodyClassName="min-h-0 overflow-hidden p-0"
       actions={
@@ -83,8 +83,8 @@ export function ExecutionTimeline({
           {visibleObjects.length === 0 ? (
             <div className="flex h-full min-h-0 items-center justify-center text-center">
               <div>
-                <div className="text-xs font-semibold text-ink">No spans match this filter</div>
-                <p className="mt-1 text-[10px] text-muted">Adjust search or filter to inspect runtime spans.</p>
+                <div className="text-xs font-semibold text-ink">No events match this filter</div>
+                <p className="mt-1 text-[10px] text-muted">Adjust search or filter to inspect runtime events.</p>
               </div>
             </div>
           ) : (
@@ -130,9 +130,9 @@ function TraceSummary({ summary }: { summary: TraceSummaryModel }) {
   return (
     <div className="rounded-lg border border-line bg-slate-50/70 px-2.5 py-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-muted">
-        <span>trace {shortId(summary.traceId)}</span>
+        <span>task {shortId(summary.traceId)}</span>
         <span>root {summary.rootSpan ?? '-'}</span>
-        <span>spans {summary.spanCount}</span>
+        <span>events {summary.eventCount}</span>
         <span>events {summary.eventCount}</span>
         <span>duration {formatDuration(summary.duration)}</span>
       </div>
@@ -391,7 +391,7 @@ function EmptyFlow({ onStart }: { onStart?: () => void }) {
             Flow Trace
           </div>
           <p className="mt-0.5 text-[10px] text-muted">
-            Start a task to stream runtime spans into this rail.
+            Start a task to stream runtime events into this rail.
           </p>
         </div>
         {onStart && (

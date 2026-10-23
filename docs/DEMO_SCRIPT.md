@@ -96,7 +96,7 @@ Point out:
 
 ### 1:30-2:20 Explain Synchronization
 
-Click a Graph node or Timeline span.
+Click a Graph node or Timeline event.
 
 Say:
 
@@ -198,26 +198,26 @@ Say:
 The frontend does not import runtime classes directly. It uses API contracts and SSE events, which keeps the console decoupled from the runtime implementation.
 ```
 
-### 5. Failure Recovery Demo
+### 5. Tool Failure And Step Retry
 
 Click:
 
 ```text
-Failure -> Retry
+Tool error -> step retry
 ```
 
-Show:
+The server plans `querySalesData` with region `华中`, which is intentionally unsupported. Show:
 
-- Tool Error
-- Task Retry
-- Reflection
-- Success
-- Inspector metadata
+- the real `tool_error` and the failed step in the graph
+- the failure panel: tool name, error message, args, attempt number
+- edit `region` from `华中` to `华东` and click `重试此步`
+- the runtime resumes at step 1, re-runs only that step, then continues steps 2–4
+- Inspector shows two attempts (failed #1, success #2)
 
 Say:
 
 ```text
-This demo proves the UI is not only for happy-path execution. It can explain failure, retry, recovery, and final success.
+This is a real failure path: the task fails on the server, the console explains which step failed, and the retry API re-runs that step with corrected arguments. Earlier steps are not repeated.
 ```
 
 ### 6. Supporting Pages
@@ -315,7 +315,7 @@ RuntimeObject is the frontend projection layer.
 Show:
 
 - Graph node selection
-- Timeline span expansion
+- Timeline event expansion
 - Drawer tabs
 - Inspector context mode
 - Evidence navigation
@@ -326,19 +326,20 @@ Say:
 The important design decision is not just drawing a graph. It is making every surface point to the same selected runtime object.
 ```
 
-### 24-28 Minutes: Failure Recovery
+### 24-28 Minutes: Tool Failure And Step Retry
 
 Run:
 
 ```text
-Failure -> Retry
+Tool error -> step retry
 ```
 
 Explain:
 
 - why failure cases matter for agent tooling
-- how `tool_error` and `task_retry` become visible
-- how Reflection validates recovery
+- how `tool_error`, `state_update`, and `task_retry` become visible
+- how a step retry resumes the plan without re-running completed steps
+- how attempts are recorded (`attemptNo`, args, error) and shown in the Inspector
 - why this helps an engineer trust the runtime
 
 ### 28-30 Minutes: Roadmap And Boundaries
@@ -346,7 +347,7 @@ Explain:
 Say:
 
 ```text
-Next useful steps are runtime deepening, richer span tree search, Knowledge Platform, Memory Platform, and Evaluation history. I would not add billing, RBAC, SSO, or multi-tenant features unless the target role requires enterprise SaaS.
+Next useful steps are runtime deepening, richer event tree search, Knowledge Platform, Memory Platform, and Evaluation history. I would not add billing, RBAC, SSO, or multi-tenant features unless the target role requires enterprise SaaS.
 ```
 
 ## Q&A
@@ -386,7 +387,7 @@ Scoped / future:
 
 For job-search impact:
 
-1. richer span tree search / filters
+1. richer event tree search / filters
 2. better Knowledge chunk drill-down
 3. memory graph
 4. evaluation history comparison
@@ -400,7 +401,7 @@ Before recording:
 - React Console is running on `5173`.
 - `/agent` opens in Idle state.
 - `Run full demo` completes successfully.
-- `Failure -> Retry` completes successfully.
+- `Tool error -> step retry` shows a real failure, then completes after editing the region.
 - Graph node click opens Drawer.
 - Timeline click updates Inspector.
 - Evaluation page shows score and feedback.

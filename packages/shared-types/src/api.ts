@@ -1,6 +1,6 @@
-import type { AgentTrace, Plan, PlanStep, ToolResult } from './agent';
+import type { AgentResumeContext, AgentTrace, Plan, PlanStep, ToolResult } from './agent';
 import type { ApprovalStatus, ToolRiskLevel, UserContext } from './security';
-import type { TaskRecord, TaskStatus } from './task';
+import type { TaskRecord, TaskStatus, TaskStepRecord } from './task';
 
 export type AgentTaskStatus = TaskStatus;
 
@@ -57,10 +57,24 @@ export interface AgentTaskStatusResponse {
   retryCount: number;
   maxRetry: number;
   lastError?: string;
+  /** LLM provider/model that served this run. */
+  provider?: string;
+  model?: string;
+  /** Present on single-task reads; list responses omit plan/steps/trace. */
+  plan?: Plan;
+  steps?: TaskStepRecord[];
+  failedStepId?: string;
+  input?: string;
+  trace?: AgentTrace;
 }
 
 export interface AgentTaskListResponse {
   tasks: AgentTaskStatusResponse[];
+}
+
+export interface AgentTaskHistoryResponse {
+  task: AgentTaskStatusResponse;
+  events: AgentServerEvent[];
 }
 
 export interface ApiErrorResponse {
@@ -75,11 +89,32 @@ export interface CancelAgentTaskResponse {
   status: Extract<AgentTaskStatus, 'cancelled'>;
 }
 
+export interface RetryAgentTaskRequest {
+  /** Optional replacement input for a full task retry. */
+  input?: string;
+}
+
 export interface RetryAgentTaskResponse {
   taskId: string;
   status: Extract<AgentTaskStatus, 'running' | 'queued'>;
   retryCount: number;
   maxRetry: number;
+}
+
+export interface RetryAgentTaskStepRequest {
+  /** Corrected arguments for the failed step; merged over the original args. */
+  args?: Record<string, unknown>;
+}
+
+export interface RetryAgentTaskStepResponse {
+  taskId: string;
+  status: Extract<AgentTaskStatus, 'running'>;
+  retryCount: number;
+  maxRetry: number;
+  stepId: string;
+  toolName: string;
+  attemptNo: number;
+  args?: Record<string, unknown>;
 }
 
 export interface PlanStartPayload {
@@ -95,12 +130,16 @@ export interface ToolStartPayload {
   toolCallId?: string;
   toolName: string;
   args: Record<string, unknown>;
+  stepId?: string;
+  attemptNo?: number;
 }
 
 export interface ToolSuccessPayload {
   toolCallId?: string;
   toolName: string;
   result: ToolResult;
+  stepId?: string;
+  attemptNo?: number;
 }
 
 export interface ToolErrorPayload {
@@ -110,6 +149,8 @@ export interface ToolErrorPayload {
     type: 'not_found' | 'timeout' | 'argument' | 'execution';
     message: string;
   };
+  stepId?: string;
+  attemptNo?: number;
 }
 
 export interface ToolSecurityPayload {
@@ -162,6 +203,7 @@ export interface StateUpdatePayload {
   currentStep?: string;
   completedStepIds: string[];
   progress: number;
+  attemptNo?: number;
 }
 
 export interface FinalAnswerPayload {
@@ -186,6 +228,10 @@ export interface RuntimeTaskContext {
   conversationId?: string;
   signal?: AbortSignal;
   emit: AgentEventSink;
+  /** 1-based run number for this task (task retries increment it). */
+  attemptNo?: number;
+  /** Set when resuming a failed run at a single step. */
+  resume?: AgentResumeContext;
 }
 
 export interface AgentRuntimePort {

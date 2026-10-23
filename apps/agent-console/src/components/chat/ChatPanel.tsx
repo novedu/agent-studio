@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { AgentIcon, Badge, SparkIcon } from '../ui';
 import { InputBox } from './InputBox';
 import { MessageItem } from './MessageItem';
-import type { ConsoleMessage } from '../../types/agent';
+import { FailurePanel } from './FailurePanel';
+import type { ConsoleMessage, ToolCallRecord } from '../../types/agent';
 import type { RuntimeOverview } from '../../features/agent-console/runtime-overview';
 import type { RuntimeObject } from '../../features/agent-console/runtime-object-model';
 
@@ -19,16 +20,18 @@ interface ChatPanelProps {
   highlightedMessageId?: string;
   hasTaskActivity?: boolean;
   onStartTask?: (input?: string) => void;
-  onStartRetryDemo?: () => void;
+  onStartFailureDemo?: () => void;
   runtimeOverview: RuntimeOverview;
   runtimeObjects: RuntimeObject[];
-  /** Provider reported by the server health check, e.g. "mock" or "openai". */
-  runtimeProvider?: string;
   onNewConversation?: () => void;
   errorMessage?: string;
   onRetry?: () => void;
   onDismissError?: () => void;
   onRetryMessage?: (question: string) => void;
+  /** The latest failed tool call, shown as an editable retry panel. */
+  failedTool?: ToolCallRecord;
+  onRetryStep?: (args: Record<string, unknown>) => void;
+  cancelled?: boolean;
 }
 
 export function ChatPanel({
@@ -44,15 +47,17 @@ export function ChatPanel({
   highlightedMessageId,
   hasTaskActivity,
   onStartTask,
-  onStartRetryDemo,
+  onStartFailureDemo,
   runtimeOverview,
   runtimeObjects,
-  runtimeProvider,
   onNewConversation,
   errorMessage,
   onRetry,
   onDismissError,
   onRetryMessage,
+  failedTool,
+  onRetryStep,
+  cancelled,
 }: ChatPanelProps) {
   const messageViewportRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -62,7 +67,7 @@ export function ChatPanel({
     const viewport = messageViewportRef.current;
     if (!viewport || !autoScroll) return;
     viewport.scrollTop = viewport.scrollHeight;
-  }, [autoScroll, messages]);
+  }, [autoScroll, failedTool, messages]);
 
   function handleScroll() {
     const viewport = messageViewportRef.current;
@@ -106,8 +111,17 @@ export function ChatPanel({
               New
             </button>
           ) : null}
-          <Badge tone={isStreaming ? 'info' : 'neutral'} className="px-1.5 py-0.5 text-[10px]">
-            {isStreaming ? 'Streaming' : 'Ready'}
+          <Badge
+            tone={isStreaming ? 'info' : errorMessage ? 'danger' : cancelled ? 'warning' : 'neutral'}
+            className="px-1.5 py-0.5 text-[10px]"
+          >
+            {isStreaming
+              ? 'Streaming'
+              : errorMessage
+                ? 'Needs attention'
+                : cancelled
+                  ? 'Cancelled'
+                  : 'Ready'}
           </Badge>
         </div>
       </header>
@@ -130,7 +144,7 @@ export function ChatPanel({
           <RuntimePreview
             messages={messages}
             onStartTask={onStartTask}
-            onStartRetryDemo={onStartRetryDemo}
+            onStartFailureDemo={onStartFailureDemo}
             runtimeOverview={runtimeOverview}
           />
         ) : (
@@ -160,6 +174,9 @@ export function ChatPanel({
                   }
                 />
               ))}
+              {failedTool && onRetryStep ? (
+                <FailurePanel tool={failedTool} onRetry={onRetryStep} disabled={isStreaming} />
+              ) : null}
             </div>
           </div>
         )}
@@ -177,7 +194,7 @@ export function ChatPanel({
 
       {/* Input box - always at bottom */}
       <div className="shrink-0">
-        {errorMessage ? (
+        {errorMessage && !failedTool ? (
           <div className="mx-3 mb-1 flex items-start justify-between gap-2 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5">
             <p className="text-[11px] leading-4 text-rose-700">{errorMessage}</p>
             <div className="flex shrink-0 items-center gap-1">
@@ -208,7 +225,6 @@ export function ChatPanel({
           onSubmit={onSubmit}
           onStop={onStop}
           onRegenerate={onRegenerate}
-          runtimeProvider={runtimeProvider}
         />
       </div>
     </section>
@@ -222,21 +238,21 @@ const suggestions = [
     input: '分析华东区域销售下降原因，并生成报告',
   },
   {
-    title: 'Failure recovery demo',
-    detail: 'Tool Error -> Retry -> Reflection -> Success',
-    input: 'retry-demo',
+    title: 'Tool failure -> step retry',
+    detail: 'Real tool error, edit the arguments, re-run only the failed step',
+    input: 'failure-demo',
   },
 ] as const;
 
 function RuntimePreview({
   messages,
   onStartTask,
-  onStartRetryDemo,
+  onStartFailureDemo,
   runtimeOverview,
 }: {
   messages: ConsoleMessage[];
   onStartTask?: (input?: string) => void;
-  onStartRetryDemo?: () => void;
+  onStartFailureDemo?: () => void;
   runtimeOverview: RuntimeOverview;
 }) {
   return (
@@ -267,10 +283,10 @@ function RuntimePreview({
             </button>
             <button
               type="button"
-              onClick={onStartRetryDemo}
+              onClick={onStartFailureDemo}
               className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-amber-300/50 bg-amber-400/10 px-3 text-[10px] font-semibold text-amber-100 transition-colors duration-200 hover:bg-amber-400/20"
             >
-              {'Failure -> Retry'}
+              {'Tool error -> step retry'}
             </button>
           </div>
         </div>
@@ -314,8 +330,8 @@ function RuntimePreview({
               key={suggestion.title}
               type="button"
               onClick={() => {
-                if (suggestion.input === 'retry-demo') {
-                  onStartRetryDemo?.();
+                if (suggestion.input === 'failure-demo') {
+                  onStartFailureDemo?.();
                   return;
                 }
                 onStartTask?.(suggestion.input);

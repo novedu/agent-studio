@@ -1,6 +1,9 @@
 import type { AgentStateSnapshot, AgentStateStatus, Plan, PlanStepStatus, ToolResult } from '@shared-types/agent';
 
 export class AgentState {
+  /** Called after every state mutation so the server can stream progress live. */
+  onChange?: (snapshot: AgentStateSnapshot) => void;
+
   private goal: string;
   private steps: AgentStateSnapshot['steps'];
   private currentStepId?: string;
@@ -27,6 +30,30 @@ export class AgentState {
 
   getCurrentStepId(): string | undefined {
     return this.currentStepId;
+  }
+
+  /**
+   * Rebuild a state from a previous run before resuming at a failed step.
+   * Completed steps are marked completed and everything else returns to pending;
+   * the retried step is then driven forward by the workflow again.
+   */
+  hydrate(completedStepIds: string[]): void {
+    const completed = new Set(completedStepIds);
+    this.completedStepIds = [];
+
+    for (const step of this.steps) {
+      if (completed.has(step.id)) {
+        step.status = 'completed';
+        this.completedStepIds.push(step.id);
+      } else {
+        step.status = 'pending';
+      }
+    }
+
+    this.currentStepId = undefined;
+    this.status = 'running';
+    this.error = undefined;
+    this.capture();
   }
 
   getHistory(): AgentStateSnapshot[] {
@@ -85,7 +112,9 @@ export class AgentState {
   }
 
   private capture(): void {
-    this.history.push(this.snapshot());
+    const snapshot = this.snapshot();
+    this.history.push(snapshot);
+    this.onChange?.(snapshot);
   }
 }
 

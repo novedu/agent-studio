@@ -14,7 +14,7 @@ import {
 import {
   buildRuntimeOverview,
   getRuntimeEnvironmentLabel,
-  getRuntimeModelLabel,
+  useRuntimeModelLabel,
 } from '@console/features/agent-console/runtime-overview';
 import {
   listAgentTasks,
@@ -40,6 +40,7 @@ export function Dashboard() {
   const memory = useAgentStore((state) => state.memory);
   const evaluation = useAgentStore((state) => state.evaluation);
   const runtimeState = useAgentStore((state) => state.state);
+  const modelLabel = useRuntimeModelLabel();
 
   const runtimeOverview = useMemo(
     () =>
@@ -53,8 +54,9 @@ export function Dashboard() {
         evaluation,
         state: runtimeState,
         status,
+        modelLabel,
       }),
-    [citations, evaluation, events, memory, messages, plan, runtimeState, status, tools],
+    [citations, evaluation, events, memory, messages, modelLabel, plan, runtimeState, status, tools],
   );
 
   const refresh = useCallback(async () => {
@@ -161,6 +163,8 @@ function RuntimeOverviewHeader({
   error?: string;
   onRefresh: () => void;
 }) {
+  const modelLabel = useRuntimeModelLabel();
+
   return (
     <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-4">
       <div className="min-w-0">
@@ -177,7 +181,7 @@ function RuntimeOverviewHeader({
         <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[10px] text-muted">
           <span>{getRuntimeEnvironmentLabel()}</span>
           <span className="text-lineStrong">·</span>
-          <span>{getRuntimeModelLabel()}</span>
+          <span>{modelLabel}</span>
           <span className="text-lineStrong">·</span>
           <span>runtime {status}</span>
         </div>
@@ -303,7 +307,7 @@ function RecentTasksPanel({ tasks }: { tasks: AgentTaskStatusResponse[] }) {
               className="border-b border-line last:border-b-0"
             >
               <Link
-                to="/agent"
+                to={`/runs/${task.taskId}`}
                 className="group flex min-w-0 items-center gap-3 px-4 py-3 transition-colors duration-200 hover:bg-panel focus:bg-panel focus:outline-none lg:px-5"
               >
                 <div className="min-w-0 flex-1">
@@ -318,6 +322,11 @@ function RecentTasksPanel({ tasks }: { tasks: AgentTaskStatusResponse[] }) {
                     <span>progress {task.progress}%</span>
                     <span>retry {task.retryCount}/{task.maxRetry}</span>
                     {task.currentStep && <span>step {task.currentStep}</span>}
+                    {task.provider ? (
+                      <span>
+                        {task.provider === 'mock' ? 'mock' : `${task.provider}${task.model ? ` · ${task.model}` : ''}`}
+                      </span>
+                    ) : null}
                   </div>
                   {task.lastError && (
                     <p className="mt-1 truncate text-[10px] text-rose-700">{task.lastError}</p>
@@ -381,8 +390,11 @@ function FailureReviewPanel({
                       </span>
                     </div>
                   </div>
-                  <Link to="/agent" className="text-[10px] font-semibold text-blue-700 hover:underline">
-                    Inspect
+                  <Link
+                    to={`/runs/${task.taskId}`}
+                    className="text-[10px] font-semibold text-blue-700 hover:underline"
+                  >
+                    Open run
                   </Link>
                 </div>
                 <p className="mt-3 line-clamp-3 text-xs leading-5 text-rose-700">

@@ -22,7 +22,7 @@ interface AgentState {
   citations: CitationRecord[];
   memory: MemoryRecord[];
   evaluation?: EvaluationResult;
-  status: 'idle' | 'running' | 'success' | 'error';
+  status: 'idle' | 'running' | 'success' | 'error' | 'cancelled';
   state?: AgentStateSnapshot;
   addMessage: (message: Message) => void;
   updateMessage: (id: string, patch: Partial<Message>) => void;
@@ -50,10 +50,18 @@ interface AgentState {
   /** Human readable failure shown above the composer. */
   lastError?: string;
   setLastError: (message?: string) => void;
+  /** Safe runtime identity reported by /health (mock vs real model). */
+  runtimeProvider?: string;
+  runtimeModel?: string;
+  setRuntimeInfo: (info: { provider?: string; model?: string }) => void;
   /** Flags the message that was streaming when the connection dropped. */
   markInterrupted: () => void;
   /** Clears the visible transcript and starts a fresh conversation. */
   startNewConversation: () => void;
+  /** Starts a new assistant turn for a step retry without clearing runtime history. */
+  beginRetry: () => void;
+  /** Marks a user-confirmed cancellation (only after the server returns 2xx). */
+  markCancelled: () => void;
 }
 
 export const useAgentStore = create<AgentState>()(
@@ -143,7 +151,12 @@ export const useAgentStore = create<AgentState>()(
     get().handleAgentEvent(event);
   },
 
-  setStreaming: (value) => set({ isStreaming: value, status: value ? 'running' : 'idle' }),
+  setStreaming: (value) =>
+    set((state) => ({
+      isStreaming: value,
+      // Never downgrade a finished run to idle just because the composer unlocked.
+      status: value ? 'running' : state.status,
+    })),
   upsertTool: (tool) =>
     set((state) => {
       const exists = state.tools.some((item) => item.id === tool.id);
@@ -158,6 +171,7 @@ export const useAgentStore = create<AgentState>()(
   setState: (agentState) => set({ state: agentState }),
   setStatus: (status) => set({ status, isStreaming: status === 'running' }),
   setLastError: (message) => set({ lastError: message }),
+  setRuntimeInfo: (info) => set({ runtimeProvider: info.provider, runtimeModel: info.model }),
   markInterrupted: () => {
     const { activeAssistantMessageId, messages } = get();
     if (!activeAssistantMessageId) {
@@ -176,6 +190,42 @@ export const useAgentStore = create<AgentState>()(
   startNewConversation: () => {
     get().reset();
     set({ messages: [], conversationId: undefined, status: 'idle', isStreaming: false });
+  },
+
+  beginRetry: () => {
+    const assistantMessageId = createId('msg');
+    set((state) => ({
+      messages: [
+        ...state.messages,
+        {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: '',
+          createdAt: Date.now(),
+        },
+      ],
+      activeAssistantMessageId: assistantMessageId,
+      answerBuffer: '',
+      status: 'running',
+      isStreaming: true,
+      lastError: undefined,
+    }));
+  },
+
+  markCancelled: () => {
+    const { activeAssistantMessageId, messages } = get();
+    set({
+      status: 'cancelled',
+      isStreaming: false,
+      lastError: undefined,
+      messages: activeAssistantMessageId
+        ? messages.map((message) =>
+            message.id === activeAssistantMessageId && !message.content
+              ? { ...message, content: '任务已取消。' }
+              : message,
+          )
+        : messages,
+    });
   },
     }),
     {
@@ -220,13 +270,16 @@ function handleAgentEvent(set: StoreSet, get: StoreGet, event: AgentEvent): void
     case 'tool_success':
       upsertToolFromEvent(set, event, 'success');
       break;
-    case 'tool_error':
+    case 'tool_error': {
       upsertToolFromEvent(set, event, 'failed');
-      set({ status: 'error', isStreaming: false });
+      const message = (payload.error as { message?: string } | undefined)?.message;
+      set({ status: 'error', isStreaming: false, lastError: message });
       break;
+    }
     case 'permission_denied':
     case 'tool_blocked':
     case 'approval_required':
+      set({ lastError: (payload.reason as string | undefined) ?? '工具调用被安全策略拦截' });
       break;
     case 'rag_retrieve':
       set({ citations: toCitations(event), memory: get().memory, memories: get().memories });
@@ -244,25 +297,71 @@ function handleAgentEvent(set: StoreSet, get: StoreGet, event: AgentEvent): void
         set({ evaluation: payload });
       }
       break;
-    case 'state_update':
-      set({ state: toStateSnapshot(get(), event) });
+    case 'state_update': {
+      const snapshot = toStateSnapshot(get(), event);
+      const currentPlan = get().plan;
+      set({
+        state: snapshot,
+        plan: currentPlan
+          ? {
+              ...currentPlan,
+              steps: currentPlan.steps.map((step) => {
+                if (snapshot.completedStepIds.includes(step.id)) {
+                  return { ...step, status: 'success' as const };
+                }
+                if (step.id === snapshot.currentStepId) {
+                  return {
+                    ...step,
+                    status: snapshot.status === 'failed' ? 'failed' : 'running',
+                  };
+                }
+                return step.status === 'failed' ? step : { ...step, status: 'pending' as const };
+              }),
+            }
+          : currentPlan,
+      });
       break;
+    }
     case 'final_answer':
       applyFinalAnswer(set, get, payload);
       break;
-    case 'task_complete':
+    case 'task_complete': {
+      const nextStatus = getTaskCompleteStatus(payload);
+      const state = get();
+      const activeId = state.activeAssistantMessageId;
+      const activeMessage = activeId
+        ? state.messages.find((message) => message.id === activeId)
+        : undefined;
+      const payloadError = typeof payload.error === 'string' ? payload.error : undefined;
+
+      // A failed run has no answer, so leave a readable failure note instead of
+      // a forever-"thinking" assistant bubble.
+      const fallback =
+        nextStatus === 'error'
+          ? `任务执行失败。\n\n${payloadError ?? state.lastError ?? '请查看失败步骤并重试。'}`
+          : nextStatus === 'cancelled'
+            ? '任务已取消。'
+            : undefined;
+
       set({
-        status: getTaskCompleteStatus(payload),
+        status: nextStatus,
         isStreaming: false,
         activeAssistantMessageId: undefined,
-        lastError: undefined,
+        lastError: nextStatus === 'error' ? (payloadError ?? state.lastError) : undefined,
+        messages:
+          fallback && activeId && activeMessage && !activeMessage.content
+            ? state.messages.map((message) =>
+                message.id === activeId ? { ...message, content: fallback } : message,
+              )
+            : state.messages,
       });
       break;
+    }
     case 'task_cancelled':
-      set({ status: 'error', isStreaming: false });
+      set({ status: 'cancelled', isStreaming: false, lastError: undefined });
       break;
     case 'task_retry':
-      set({ status: 'running', isStreaming: true });
+      set({ status: 'running', isStreaming: true, lastError: undefined });
       break;
     case 'task_failed':
       set({ status: 'error', isStreaming: false });
@@ -280,15 +379,22 @@ function upsertToolFromEvent(set: StoreSet, event: AgentEvent, status: StepStatu
     args?: unknown;
     result?: { data?: unknown; duration?: number; error?: string };
     error?: unknown;
+    stepId?: unknown;
+    attemptNo?: unknown;
   };
   const name = typeof payload.toolName === 'string' ? payload.toolName : 'unknownTool';
+  const stepId = typeof payload.stepId === 'string' ? payload.stepId : undefined;
+  const attemptNo = typeof payload.attemptNo === 'number' ? payload.attemptNo : 1;
   const result = payload.result?.data ?? payload.result ?? payload.error;
 
   set((state) => {
-    const previous = state.tools.find((tool) => tool.id === getToolRecordId(event, name));
+    const id = getToolRecordId(event, name, stepId, attemptNo);
+    const previous = state.tools.find((tool) => tool.id === id);
     const tool: ToolCallRecord = {
-      id: getToolRecordId(event, name),
+      id,
       name,
+      stepId,
+      attemptNo,
       args: isRecord(payload.args) ? payload.args : (previous?.args ?? {}),
       status,
       result: result ?? previous?.result,
@@ -516,17 +622,25 @@ function normalizeStepStatus(status: unknown): StepStatus {
 function normalizeStateStatus(status: unknown): AgentStateSnapshot['status'] {
   if (status === 'completed' || status === 'success') return 'success';
   if (status === 'failed' || status === 'error') return 'failed';
+  if (status === 'cancelled') return 'cancelled';
   if (status === 'planning') return 'planning';
   if (status === 'running') return 'running';
   return 'idle';
 }
 
 function getTaskCompleteStatus(payload: Record<string, unknown>): AgentState['status'] {
-  return payload.status === 'completed' ? 'success' : 'error';
+  if (payload.status === 'completed') return 'success';
+  if (payload.status === 'cancelled') return 'cancelled';
+  return 'error';
 }
 
-function getToolRecordId(event: AgentEvent, toolName: string): string {
-  return `${event.taskId ?? 'task'}_${toolName}`;
+function getToolRecordId(
+  event: AgentEvent,
+  toolName: string,
+  stepId?: string,
+  attemptNo = 1,
+): string {
+  return `${event.taskId ?? 'task'}_${stepId ?? toolName}_${attemptNo}`;
 }
 
 function getLastUserInput(messages: Message[]): string | undefined {

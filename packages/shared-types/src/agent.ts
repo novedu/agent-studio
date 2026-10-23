@@ -121,6 +121,10 @@ export interface ToolStartEvent extends AgentEventBase<'tool_start'> {
   messageId: string;
   toolName: string;
   args: Record<string, unknown>;
+  /** Plan step this tool call belongs to (used for step-level retry). */
+  stepId?: string;
+  /** 1-based attempt number for this step. */
+  attemptNo?: number;
 }
 
 export interface ToolSuccessEvent extends AgentEventBase<'tool_success'> {
@@ -128,6 +132,8 @@ export interface ToolSuccessEvent extends AgentEventBase<'tool_success'> {
   messageId: string;
   toolName: string;
   result: ToolResult;
+  stepId?: string;
+  attemptNo?: number;
 }
 
 export interface ToolErrorEvent extends AgentEventBase<'tool_error'> {
@@ -138,6 +144,8 @@ export interface ToolErrorEvent extends AgentEventBase<'tool_error'> {
     type: 'not_found' | 'timeout' | 'argument' | 'execution';
     message: string;
   };
+  stepId?: string;
+  attemptNo?: number;
 }
 
 export interface ToolSecurityEvent extends AgentEventBase<ToolSecurityEventType> {
@@ -210,6 +218,23 @@ export interface PlanStep {
 export interface Plan {
   goal: string;
   steps: PlanStep[];
+}
+
+/**
+ * Everything needed to resume a failed run at one plan step.
+ *
+ * The conversation is deliberately reused: it already contains the user turn,
+ * the earlier tool calls and the failed tool result, so the LLM step after the
+ * retried tool sees the full context instead of a detached prompt.
+ */
+export interface AgentResumeContext {
+  plan: Plan;
+  completedStepIds: string[];
+  startStepId: string;
+  /** Corrected arguments for the retried step. */
+  stepArgs?: Record<string, unknown>;
+  conversationId: string;
+  attemptNo: number;
 }
 
 export type AgentStateStatus = 'idle' | 'planning' | 'running' | 'completed' | 'failed';

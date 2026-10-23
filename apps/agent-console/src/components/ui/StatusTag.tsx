@@ -16,7 +16,8 @@ export function StatusTag({ status }: StatusTagProps) {
 function getTone(status: string): 'neutral' | 'info' | 'success' | 'warning' | 'danger' {
   if (status === 'running' || status === 'queued' || status === 'planning') return 'info';
   if (status === 'success' || status === 'completed') return 'success';
-  if (status === 'error' || status === 'failed' || status === 'cancelled') return 'danger';
+  if (status === 'error' || status === 'failed') return 'danger';
+  if (status === 'cancelled') return 'warning';
   if (status === 'streaming') return 'info';
   return 'neutral';
 }

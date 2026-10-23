@@ -72,3 +72,22 @@ export function resolveLLMConfig(env: NodeJS.ProcessEnv = process.env): Resolved
 export function getLLMProviderName(env: NodeJS.ProcessEnv = process.env): LLMProviderName {
   return resolveLLMConfig(env).provider;
 }
+
+export interface RuntimeModelInfo {
+  provider: LLMProviderName;
+  model?: string;
+  /** Human-readable label that never implies a real model when running mock. */
+  label: string;
+}
+
+/** Safe runtime identity for /health, task snapshots and the console header. */
+export function getRuntimeModelInfo(env: NodeJS.ProcessEnv = process.env): RuntimeModelInfo {
+  const config = resolveLLMConfig(env);
+  if (config.provider === 'mock') {
+    return { provider: 'mock', label: 'Mock · 模板' };
+  }
+
+  const model = config.model ?? (config.provider === 'deepseek' ? 'deepseek-chat' : 'gpt-4.1-mini');
+  const vendor = config.provider === 'deepseek' ? 'DeepSeek' : 'OpenAI';
+  return { provider: config.provider, model, label: `${vendor} · ${model}` };
+}

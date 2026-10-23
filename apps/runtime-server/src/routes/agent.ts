@@ -1,12 +1,16 @@
 import type { AgentEventSink, AgentServerEvent } from '@shared-types/api';
 import type {
+  AgentTaskHistoryResponse,
   AgentTaskListResponse,
   AgentTaskStatusResponse,
   ApiErrorResponse,
   CancelAgentTaskResponse,
   CreateAgentTaskRequest,
   CreateAgentTaskResponse,
+  RetryAgentTaskRequest,
   RetryAgentTaskResponse,
+  RetryAgentTaskStepRequest,
+  RetryAgentTaskStepResponse,
 } from '@shared-types/api';
 import type { TaskManager } from '../task/task-manager';
 import type { TaskRecord } from '@shared-types/task';
@@ -28,6 +32,11 @@ export const agentRoutes = [
     description: 'Retry a failed or cancelled Agent task.',
   },
   {
+    method: 'POST',
+    path: '/api/agent/tasks/:taskId/steps/:stepId/retry',
+    description: 'Re-run one failed step with corrected args, then continue the plan.',
+  },
+  {
     method: 'GET',
     path: '/api/agent/tasks/:taskId/events',
     description: 'Subscribe to Agent task events through SSE.',
@@ -39,6 +48,11 @@ export const agentRoutes = [
   },
   {
     method: 'GET',
+    path: '/api/agent/tasks/:taskId/history',
+    description: 'Read the persisted task snapshot and its full event history.',
+  },
+  {
+    method: 'GET',
     path: '/api/agent/tasks',
     description: 'List Agent task history.',
   },
@@ -46,7 +60,8 @@ export const agentRoutes = [
 
 export interface AgentEventHub {
   publish: (event: AgentServerEvent) => void;
-  subscribe: (taskId: string, listener: AgentEventSink) => () => void;
+  subscribe: (taskId: string, listener: AgentEventSink, afterEventId?: string) => () => void;
+  getHistory: (taskId: string) => AgentServerEvent[];
 }
 
 export interface AgentRouteDependencies {
@@ -59,10 +74,23 @@ export interface AgentRouteHandlers {
     request: CreateAgentTaskRequest,
   ) => Promise<CreateAgentTaskResponse | ApiErrorResponse>;
   cancelTask: (taskId: string) => Promise<CancelAgentTaskResponse | ApiErrorResponse>;
-  retryTask: (taskId: string) => Promise<RetryAgentTaskResponse | ApiErrorResponse>;
+  retryTask: (
+    taskId: string,
+    request?: RetryAgentTaskRequest,
+  ) => Promise<RetryAgentTaskResponse | ApiErrorResponse>;
+  retryTaskStep: (
+    taskId: string,
+    stepId: string,
+    request?: RetryAgentTaskStepRequest,
+  ) => Promise<RetryAgentTaskStepResponse | ApiErrorResponse>;
   getTask: (taskId: string) => Promise<AgentTaskStatusResponse | ApiErrorResponse>;
+  getTaskHistory: (taskId: string) => Promise<AgentTaskHistoryResponse | ApiErrorResponse>;
   listTasks: () => Promise<AgentTaskListResponse>;
-  subscribeTaskEvents: (taskId: string, listener: AgentEventSink) => (() => void) | ApiErrorResponse;
+  subscribeTaskEvents: (
+    taskId: string,
+    listener: AgentEventSink,
+    afterEventId?: string,
+  ) => (() => void) | ApiErrorResponse;
 }
 
 export function createAgentRouteHandlers(deps: AgentRouteDependencies): AgentRouteHandlers {
@@ -101,9 +129,9 @@ export function createAgentRouteHandlers(deps: AgentRouteDependencies): AgentRou
       };
     },
 
-    retryTask: async (taskId) => {
+    retryTask: async (taskId, request) => {
       const before = deps.taskManager.getTask(taskId);
-      const task = deps.taskManager.retryTask(taskId);
+      const task = deps.taskManager.retryTask(taskId, request?.input);
 
       if (!task || !before) {
         return createTaskNotFoundError(taskId);
@@ -125,6 +153,29 @@ export function createAgentRouteHandlers(deps: AgentRouteDependencies): AgentRou
       };
     },
 
+    retryTaskStep: async (taskId, stepId, request) => {
+      const result = deps.taskManager.retryStep(taskId, stepId, request?.args);
+
+      if (result.error) {
+        return createApiError(result.error.code, result.error.message);
+      }
+
+      const task = result.task;
+      const step = task?.steps?.find((item) => item.id === stepId);
+      const attempt = step?.attempts[step.attempts.length - 1];
+
+      return {
+        taskId,
+        status: 'running',
+        retryCount: task?.retryCount ?? 1,
+        maxRetry: task?.maxRetry ?? 2,
+        stepId,
+        toolName: step?.tool ?? '',
+        attemptNo: attempt?.attemptNo ?? 1,
+        args: attempt?.args,
+      };
+    },
+
     getTask: async (taskId) => {
       const task = deps.taskManager.getTask(taskId);
 
@@ -132,26 +183,39 @@ export function createAgentRouteHandlers(deps: AgentRouteDependencies): AgentRou
         return createTaskNotFoundError(taskId);
       }
 
-      return toTaskStatusResponse(task);
+      return toTaskStatusResponse(task, true);
     },
 
-    listTasks: async () => ({
-      tasks: deps.taskManager.listTasks().map(toTaskStatusResponse),
-    }),
-
-    subscribeTaskEvents: (taskId, listener) => {
+    getTaskHistory: async (taskId) => {
       const task = deps.taskManager.getTask(taskId);
 
       if (!task) {
         return createTaskNotFoundError(taskId);
       }
 
-      return deps.eventHub.subscribe(taskId, listener);
+      return {
+        task: toTaskStatusResponse(task, true),
+        events: deps.eventHub.getHistory(taskId),
+      };
+    },
+
+    listTasks: async () => ({
+      tasks: deps.taskManager.listTasks().map((task) => toTaskStatusResponse(task, false)),
+    }),
+
+    subscribeTaskEvents: (taskId, listener, afterEventId) => {
+      const task = deps.taskManager.getTask(taskId);
+
+      if (!task) {
+        return createTaskNotFoundError(taskId);
+      }
+
+      return deps.eventHub.subscribe(taskId, listener, afterEventId);
     },
   };
 }
 
-function toTaskStatusResponse(task: TaskRecord): AgentTaskStatusResponse {
+function toTaskStatusResponse(task: TaskRecord, includeRuntime: boolean): AgentTaskStatusResponse {
   return {
     taskId: task.taskId,
     status: task.status,
@@ -161,6 +225,17 @@ function toTaskStatusResponse(task: TaskRecord): AgentTaskStatusResponse {
     retryCount: task.retryCount,
     maxRetry: task.maxRetry,
     lastError: task.lastError,
+    provider: task.provider,
+    model: task.model,
+    ...(includeRuntime
+      ? {
+          plan: task.plan,
+          steps: task.steps,
+          failedStepId: task.failedStepId,
+          input: task.input,
+          trace: task.trace,
+        }
+      : {}),
   };
 }
 

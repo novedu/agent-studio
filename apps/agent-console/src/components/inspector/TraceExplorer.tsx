@@ -30,7 +30,7 @@ export function TraceExplorer({
 
   if (isLoading && events.length === 0) return <Skeleton lines={7} />;
   if (events.length === 0) {
-    return <InspectorEmpty title="No spans captured" description="Runtime spans appear as events arrive." />;
+    return <InspectorEmpty title="No events captured" description="Runtime events appear as they arrive." />;
   }
 
   return (

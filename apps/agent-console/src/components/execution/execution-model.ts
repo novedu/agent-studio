@@ -503,3 +503,88 @@ function readErrorMessage(payload: unknown): string | undefined {
   const message = (error as { message?: unknown }).message;
   return typeof message === 'string' ? message : undefined;
 }
+
+export interface ExecutionStepAttemptView {
+  attemptNo: number;
+  status: StepStatus;
+  duration?: number;
+  args?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface ExecutionStepRow {
+  id: string;
+  order: number;
+  tool: string;
+  description: string;
+  status: ExecutionNodeStatus;
+  duration?: number;
+  attempts: ExecutionStepAttemptView[];
+  error?: string;
+  nodeId?: string;
+}
+
+export interface ExecutionStepsInput {
+  plan: Plan | null;
+  tools: ToolCallRecord[];
+  events: AgentEvent[];
+  status: string;
+}
+
+/**
+ * The default dock view: one row per plan step, not one node per runtime object.
+ * It answers "where am I / what failed / how many attempts" before the graph.
+ */
+export function buildExecutionSteps(input: ExecutionStepsInput): ExecutionStepRow[] {
+  if (!input.plan) return [];
+
+  return input.plan.steps.map((step, index) => {
+    const stepTool = step.tool ?? 'llm';
+    const records = input.tools
+      .filter((tool) => tool.stepId === step.id || (!tool.stepId && tool.name === stepTool))
+      .sort((a, b) => (a.attemptNo ?? 1) - (b.attemptNo ?? 1));
+
+    const attempts: ExecutionStepAttemptView[] = records.map((record) => ({
+      attemptNo: record.attemptNo ?? 1,
+      status: record.status,
+      duration: record.duration,
+      args: record.args,
+      error: readToolError(record.result),
+    }));
+
+    const latest = records[records.length - 1];
+    const failedAttempt = [...attempts].reverse().find((attempt) => attempt.status === 'failed');
+    const status =
+      input.status === 'cancelled' && (latest?.status === 'running' || step.status === 'running')
+        ? 'cancelled'
+        : latest
+          ? toExplorerStatus(latest.status)
+          : toExplorerStatus(step.status);
+
+    return {
+      id: step.id,
+      order: index + 1,
+      tool: stepTool,
+      description: step.description,
+      status,
+      duration: latest?.duration,
+      attempts,
+      error: failedAttempt?.error,
+      nodeId: stepTool === 'llm' ? 'answer' : `tool:${step.id}`,
+    } satisfies ExecutionStepRow;
+  });
+}
+
+function readToolError(result: unknown): string | undefined {
+  if (typeof result === 'string') return result;
+  if (!result || typeof result !== 'object') return undefined;
+
+  const record = result as { message?: unknown; error?: unknown };
+  if (typeof record.message === 'string') return record.message;
+  if (typeof record.error === 'string') return record.error;
+  if (record.error && typeof record.error === 'object') {
+    const nested = record.error as { message?: unknown };
+    if (typeof nested.message === 'string') return nested.message;
+  }
+  return undefined;
+}

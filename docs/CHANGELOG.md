@@ -6,6 +6,7 @@
 - Each task records the provider/model that served it; the Dashboard row and run detail show it.
 - Renamed "Trace Spans" to "Runtime Events" in the Inspector, Timeline and Step detail. The UI no longer implies distributed tracing.
 - Evaluation surfaces are explicitly labelled "Rule-based" / "not an LLM judge".
+- Removed the unreachable high-risk `slow_query` tool from the production registry: the console has no approval action, so shipping it would dead-end. The guardrail stays unit-tested with a test-local high-risk tool.
 - Navigation converged to Agent + Runs. Knowledge / Memory / Quality moved into Run Detail tabs; `/workflow` redirects to `/agent`; `/dashboard` redirects to `/runs`; About & limits sits in the sidebar footer. Legacy `/knowledge`, `/memory` and `/evaluation` routes show a deprecation notice.
 - Added `persistence-test.ts` (task repository + event history + `after` replay across reloads).
 

@@ -5,12 +5,14 @@ import {
   DockViewSwitch,
   ExecutionExplorer,
   ExecutionGraphEmptyState,
+  ExecutionSteps,
   ExecutionTimeline,
   StepDrawer,
   type DockView,
 } from '../../components/execution';
 import {
   buildExecutionNodes,
+  buildExecutionSteps,
   getCurrentNodeId,
   type FocusedRuntimeObject,
   type ExecutionNodeRecord,
@@ -20,6 +22,7 @@ import { RuntimeInspector } from '../../components/inspector';
 import { useAgentStream } from '../../hooks/useAgentStream';
 import { useAgentStore } from '../../store/agentStore';
 import { buildRuntimeOverview, useRuntimeModelLabel, type RuntimeOverview } from './runtime-overview';
+import { WorkspaceBar } from './WorkspaceBar';
 import {
   buildRuntimeDependencyEdges,
   buildRuntimeObjects,
@@ -30,7 +33,7 @@ const defaultTask = '分析华东区域销售下降原因，并生成报告';
 const failureDemoTask = '演示工具失败：预检华中区域销售数据，失败后用修正参数重试';
 
 export function AgentConsole() {
-  const { start, stop, retryStep } = useAgentStream();
+  const { start, stop, retryStep, taskId } = useAgentStream();
   const {
     messages,
     plan,
@@ -88,7 +91,7 @@ export function AgentConsole() {
   const [highlightedMemoryId, setHighlightedMemoryId] = useState<string>();
   const [highlightedTraceId, setHighlightedTraceId] = useState<string>();
   const [runtimeDockExpanded, setRuntimeDockExpanded] = useState(false);
-  const [dockView, setDockView] = useState<DockView>('graph');
+  const [dockView, setDockView] = useState<DockView>('steps');
   const [runtimeDockManuallyToggled, setRuntimeDockManuallyToggled] = useState(false);
   const modelLabel = useRuntimeModelLabel();
 
@@ -105,9 +108,31 @@ export function AgentConsole() {
     [status, tools],
   );
 
+  const stepRows = useMemo(
+    () => buildExecutionSteps({ plan, tools, events, status }),
+    [events, plan, status, tools],
+  );
+  const completedStepCount =
+    state?.completedStepIds.length ?? plan?.steps.filter((step) => step.status === 'success').length ?? 0;
+  const totalStepCount = plan?.steps.length ?? 0;
+  const workspaceProgress = totalStepCount
+    ? Math.round((completedStepCount / totalStepCount) * 100)
+    : status === 'success'
+      ? 100
+      : 0;
+  const eventTimestamps = events.map((event) => event.timestamp).filter((value) => value > 0);
+  const workspaceDuration =
+    eventTimestamps.length >= 2 ? Math.max(...eventTimestamps) - Math.min(...eventTimestamps) : undefined;
+  const liveRetryCount = events.filter((event) => event.type === 'task_retry').length;
+
   const focusedObjectType = focusedRuntimeObject?.type;
   const focusedObjectId = focusedRuntimeObject?.id;
   const activeNodeId = focusedNodeId ?? currentNodeId;
+  const activeStepId = activeNodeId?.startsWith('tool:')
+    ? activeNodeId.slice('tool:'.length)
+    : activeNodeId === 'answer'
+      ? plan?.steps.find((step) => step.tool === 'llm')?.id
+      : undefined;
   const currentNode = displayNodes.find((node) => node.id === currentNodeId);
   const activeNode = displayNodes.find((node) => node.id === activeNodeId) ?? currentNode;
   const currentTool =
@@ -185,12 +210,6 @@ export function AgentConsole() {
     if (status === 'running' && hasTaskActivity) {
       setRuntimeDockExpanded(true);
     }
-    // On failure the error card and the args editor matter more than the graph.
-    // Collapse the dock so the whole failure card fits in the transcript; the
-    // user can expand it again when they want to inspect the node.
-    if (status === 'error') {
-      setRuntimeDockExpanded(false);
-    }
   }, [hasTaskActivity, runtimeDockManuallyToggled, status]);
 
   function handleRuntimeDockToggle() {
@@ -212,6 +231,13 @@ export function AgentConsole() {
 
   function handleGraphSelect(node: ExecutionNodeRecord) {
     selectRuntimeNode(node, { openDrawer: true, section: 'trace' });
+  }
+
+  function handleStepSelect(step: { id: string; nodeId?: string; tool: string }) {
+    const node =
+      displayNodes.find((item) => item.id === step.nodeId) ??
+      (step.tool === 'llm' ? displayNodes.find((item) => item.kind === 'answer') : undefined);
+    if (node) selectRuntimeNode(node, { openDrawer: true, section: 'trace' });
   }
 
   function handleRuntimeObjectSelect(object: RuntimeObject) {
@@ -273,6 +299,31 @@ export function AgentConsole() {
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-ink">
+      {hasTaskActivity ? (
+        <WorkspaceBar
+          goal={latestUserMessage?.content ?? plan?.goal}
+          status={status}
+          modelLabel={modelLabel}
+          progress={workspaceProgress}
+          completedSteps={completedStepCount}
+          totalSteps={totalStepCount}
+          retryCount={liveRetryCount}
+          maxRetry={2}
+          duration={workspaceDuration}
+          failure={
+            failedTool
+              ? {
+                  stepId: failedTool.stepId,
+                  tool: failedTool.name,
+                  message: lastError,
+                }
+              : undefined
+          }
+          taskId={taskId}
+          onCancel={handleStop}
+        />
+      ) : null}
+
       <section className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
         <div
           className="grid min-h-0 min-w-0 overflow-hidden transition-[grid-template-rows] duration-200 ease-out"
@@ -327,7 +378,22 @@ export function AgentConsole() {
                   </button>
                 </div>
 
-                {/* Both views stay mounted so switching keeps zoom, filters and selection. */}
+                {/* All views stay mounted so switching keeps scroll, zoom and selection. */}
+                <div
+                  className={
+                    dockView === 'steps'
+                      ? 'min-h-0 flex-1 overflow-hidden'
+                      : 'hidden min-h-0 flex-1 overflow-hidden'
+                  }
+                >
+                  <ExecutionSteps
+                    steps={stepRows}
+                    activeStepId={activeStepId}
+                    onSelect={handleStepSelect}
+                    onStart={() => runServerTask(defaultTask)}
+                  />
+                </div>
+
                 <div
                   className={
                     dockView === 'graph'
@@ -465,8 +531,8 @@ function RuntimeDockCollapsed({
     <div className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(176px,0.8fr)_minmax(0,1fr)_minmax(220px,0.95fr)] bg-white">
       <div className="flex min-w-0 items-center justify-between gap-3 border-r border-line px-4">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-ink">Runtime Graph</div>
-          <div className="mt-0.5 truncate text-[10px] text-muted">Compact dependency strip</div>
+          <div className="truncate text-sm font-semibold text-ink">Execution</div>
+          <div className="mt-0.5 truncate text-[10px] text-muted">Steps · graph · timeline</div>
         </div>
         <button
           type="button"

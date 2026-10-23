@@ -48,6 +48,15 @@ async function caseHighRiskToolRequiresApproval(): Promise<void> {
 function createExecutor(role: string): ToolExecutor {
   const registry = new ToolRegistry();
   registerTools(registry);
+  // Test-only high-risk tool: production registration intentionally ships none.
+  registry.register({
+    name: 'slow_query',
+    description: 'Test-only high-risk tool',
+    risk: 'high',
+    async execute() {
+      return { success: true, toolName: 'slow_query', data: 'slow result', duration: 1 };
+    },
+  });
 
   return new ToolExecutor(registry, {
     userContext: {

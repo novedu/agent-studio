@@ -20,16 +20,16 @@ describe('DockViewSwitch', () => {
 
     act(() => {
       root = createRoot(container);
-      root.render(<DockViewSwitch value="graph" onChange={(next) => changes.push(next)} />);
+      root.render(<DockViewSwitch value="steps" onChange={(next) => changes.push(next)} />);
     });
 
     const buttons = Array.from(container.querySelectorAll('button'));
-    expect(buttons.map((button) => button.textContent)).toEqual(['Graph', 'Timeline']);
+    expect(buttons.map((button) => button.textContent)).toEqual(['Steps', 'Graph', 'Timeline']);
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
     expect(buttons[1].getAttribute('aria-pressed')).toBe('false');
 
     act(() => {
-      buttons[1].click();
+      buttons[2].click();
     });
 
     expect(changes).toEqual(['timeline']);

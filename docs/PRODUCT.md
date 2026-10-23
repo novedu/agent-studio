@@ -351,7 +351,7 @@ Execute and debug AI agent runtime tasks.
 
 Contains:
 
-- Chat Workspace
+- Task Workspace
 - Runtime Header
 - Runtime Dependency Graph
 - Debug Timeline

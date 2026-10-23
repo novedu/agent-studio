@@ -97,7 +97,7 @@ export function ChatPanel({
             <AgentIcon className="h-2.5 w-2.5" />
           </div>
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold leading-4 text-ink">Chat Workspace</h2>
+            <h2 className="truncate text-sm font-semibold leading-4 text-ink">Task Workspace</h2>
           </div>
         </div>
         <div className="flex items-center gap-1.5">

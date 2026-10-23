@@ -81,21 +81,9 @@ export function registerTools(registry: ToolRegistry, options: RegisterToolsOpti
     },
   });
 
-  registry.register({
-    name: 'slow_query',
-    description: '模拟一个慢查询（会触发超时）',
-    risk: 'high',
-    async execute(_args) {
-      await delay(3000);
-      return {
-        success: true,
-        toolName: 'slow_query',
-        data: 'slow result',
-        duration: 3000,
-      };
-    },
-  });
-
+  // No high-risk tool ships in the demo: a registered high-risk tool would
+  // dead-end because the console has no approval action yet. The guardrail and
+  // risk checker remain unit-tested with a test-local high-risk tool.
   registry.register({
     name: 'querySalesData',
     description: '查询指定区域和月份的销售数据',

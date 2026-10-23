@@ -1,8 +1,9 @@
 import { classNames } from '../ui/classNames';
 
-export type DockView = 'graph' | 'timeline';
+export type DockView = 'steps' | 'graph' | 'timeline';
 
 const OPTIONS: Array<{ value: DockView; label: string }> = [
+  { value: 'steps', label: 'Steps' },
   { value: 'graph', label: 'Graph' },
   { value: 'timeline', label: 'Timeline' },
 ];

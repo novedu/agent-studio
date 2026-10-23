@@ -158,7 +158,7 @@ The Agent Workspace must feel like an IDE runtime surface, not a dashboard.
 
 Core regions:
 
-- Chat Workspace: primary editor-like surface
+- Task Workspace: primary editor-like surface
 - Runtime Graph: compact dependency canvas
 - Debug Timeline: docked runtime trace
 - Inspector: selected runtime object details

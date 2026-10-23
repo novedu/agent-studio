@@ -124,7 +124,7 @@ Workspace hierarchy is fixed:
 ```text
 Runtime Banner
 ↓
-Chat Workspace
+Task Workspace
 ↓
 Runtime Visualization Strip
 ↓

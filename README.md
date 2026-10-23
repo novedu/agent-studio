@@ -39,6 +39,8 @@ The `/agent` page is the product center. Chat is the primary workspace. Graph ex
 - **Agent Runtime lifecycle**: Planner, WorkflowRunner, ToolExecutor, RAG, Evaluation, Reflection, Memory, and Final Answer.
 - **Real Runtime Server**: task creation, task query, cancel, task retry, step-level retry with corrected args, and SSE event streaming.
 - **RuntimeObject model**: one projected object model shared by Chat, Graph, Timeline, Inspector, Drawer, Evidence, Memory, and Evaluation.
+- **Execution Steps**: the default dock view — one row per plan step with status, duration and attempts; Graph and Timeline stay one click away.
+- **Task header**: full goal, status, model, step progress, failure line and a Run detail link above the chat.
 - **Execution Graph**: compact dependency graph for Planner, Workflow, Tool, Knowledge, Evaluation, Reflection, Memory, and Answer.
 - **Debug Timeline**: runtime events with component, status, duration, retry, token, metadata, input, and output.
 - **Professional Inspector**: object-driven panels for execution, input, output, reasoning, events, evidence, memory, evaluation, and logs.
@@ -483,7 +485,7 @@ Implemented:
 - TypeScript Agent Runtime
 - Planner and PlanValidator
 - WorkflowRunner
-- ToolRegistry and ToolExecutor
+- ToolRegistry and ToolExecutor with permission / risk guardrails
 - RAG retrieval over a local knowledge base
 - Working / Episodic / Semantic memory model
 - Reflection
@@ -492,6 +494,7 @@ Implemented:
 - Runtime Server with task lifecycle
 - SSE event streaming
 - Task cancel and retry
+- Plan-step list as the default dock view, with a task header and a Run detail link
 - Step-level retry with corrected tool args and per-step attempts
 - Live `state_update` events and step-based progress
 - Cancel confirmation that only reports success after a 2xx response
@@ -505,6 +508,7 @@ Implemented:
 
 Not implemented intentionally:
 
+- an approval UI (the high-risk `slow_query` tool was removed from the production registry so the runtime cannot dead-end on an approval prompt; the guardrail is still unit-tested)
 - persistent vector database
 - document upload pipeline
 - persistent memory database

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Badge, JsonViewer, Panel } from '../ui';
 import { classNames } from '../ui/classNames';
 import { ExecutionStatus } from './ExecutionStatus';
@@ -48,17 +48,15 @@ export function ExecutionTimeline({
   );
   const [filter, setFilter] = useState<TimelineFilter>('all');
   const [query, setQuery] = useState('');
-  const [expandedId, setExpandedId] = useState<string | undefined>(activeNodeId);
+  // Do not auto-expand the active span: the six JSON panels can easily exceed
+  // a short dock, which makes the list look like it cannot scroll. Expand on click.
+  const [expandedId, setExpandedId] = useState<string | undefined>();
   const visibleObjects = useMemo(
     () => flowObjects.filter((object) => matchesFilter(object, filter) && matchesQuery(object, query)),
     [filter, flowObjects, query],
   );
   const spanTree = useMemo(() => visibleObjects.map(toTimelineSpanModel), [visibleObjects]);
   const traceSummary = useMemo(() => buildTraceSummary(flowObjects), [flowObjects]);
-
-  useEffect(() => {
-    if (activeNodeId) setExpandedId(activeNodeId);
-  }, [activeNodeId]);
 
   return (
     <Panel
@@ -79,7 +77,7 @@ export function ExecutionTimeline({
       }
     >
       {flowObjects.length ? (
-        <div className="h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto px-3 py-2">
+        <div className="runtime-scroll h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto px-3 pb-6 pt-2">
           {visibleObjects.length === 0 ? (
             <div className="flex h-full min-h-0 items-center justify-center text-center">
               <div>

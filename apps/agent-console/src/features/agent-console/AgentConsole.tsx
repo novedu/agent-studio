@@ -91,6 +91,7 @@ export function AgentConsole() {
   const [highlightedMemoryId, setHighlightedMemoryId] = useState<string>();
   const [highlightedTraceId, setHighlightedTraceId] = useState<string>();
   const [runtimeDockExpanded, setRuntimeDockExpanded] = useState(false);
+  const [dockFocused, setDockFocused] = useState(false);
   const [dockView, setDockView] = useState<DockView>('steps');
   const [runtimeDockManuallyToggled, setRuntimeDockManuallyToggled] = useState(false);
   const modelLabel = useRuntimeModelLabel();
@@ -214,7 +215,14 @@ export function AgentConsole() {
 
   function handleRuntimeDockToggle() {
     setRuntimeDockManuallyToggled(true);
+    if (runtimeDockExpanded) setDockFocused(false);
     setRuntimeDockExpanded((value) => !value);
+  }
+
+  function handleDockFocusToggle() {
+    setRuntimeDockManuallyToggled(true);
+    setRuntimeDockExpanded(true);
+    setDockFocused((value) => !value);
   }
 
   function selectRuntimeNode(node: ExecutionNodeRecord, options: { openDrawer?: boolean; section?: string } = {}) {
@@ -329,8 +337,12 @@ export function AgentConsole() {
           className="grid min-h-0 min-w-0 overflow-hidden transition-[grid-template-rows] duration-200 ease-out"
           style={{
             gridTemplateRows: runtimeDockExpanded
-              ? 'minmax(280px, 1fr) clamp(360px, 50vh, 460px)'
-              : 'minmax(280px, 1fr) 72px',
+              ? dockFocused
+                ? 'minmax(0, 0fr) minmax(0, 1fr)'
+                : dockView === 'timeline'
+                  ? 'minmax(120px, 1fr) minmax(220px, min(50vh, 500px))'
+                  : 'minmax(140px, 1fr) minmax(160px, min(40vh, 460px))'
+              : 'minmax(140px, 1fr) 64px',
           }}
         >
           <div className="min-h-0 min-w-0 overflow-hidden bg-white">
@@ -363,19 +375,32 @@ export function AgentConsole() {
             />
           </div>
 
-          <div className="flex min-h-0 min-w-0 flex-col overflow-hidden border-t border-line bg-white">
+          <div
+            className="flex min-h-0 min-w-0 flex-col overflow-hidden border-t border-line bg-white"
+            style={{ gridRow: 2 }}
+          >
             {runtimeDockExpanded ? (
               <>
                 <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-line bg-white px-2">
                   <DockViewSwitch value={dockView} onChange={setDockView} />
-                  <button
-                    type="button"
-                    onClick={handleRuntimeDockToggle}
-                    className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-md border border-line bg-white px-2 text-[10px] font-semibold text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
-                  >
-                    <ChevronDownIcon className="h-3 w-3" />
-                    Collapse
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={handleDockFocusToggle}
+                      title="Expand the runtime dock to the full workspace"
+                      className="inline-flex h-6 cursor-pointer items-center rounded-md border border-line bg-white px-2 text-[10px] font-semibold text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
+                    >
+                      {dockFocused ? 'Exit focus' : 'Focus'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRuntimeDockToggle}
+                      className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-md border border-line bg-white px-2 text-[10px] font-semibold text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
+                    >
+                      <ChevronDownIcon className="h-3 w-3" />
+                      Collapse
+                    </button>
+                  </div>
                 </div>
 
                 {/* All views stay mounted so switching keeps scroll, zoom and selection. */}
@@ -478,6 +503,7 @@ export function AgentConsole() {
   );
 
   function runServerTask(input: string) {
+    setDockFocused(false);
     setRuntimeDockManuallyToggled(false);
     setRuntimeDockExpanded(true);
     setAutoFollowRuntime(true);

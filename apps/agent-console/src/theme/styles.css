@@ -73,3 +73,22 @@ a,
 summary {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Runtime lists: make the scroll affordance visible on macOS overlay scrollbars. */
+.runtime-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.runtime-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.runtime-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.runtime-scroll::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}

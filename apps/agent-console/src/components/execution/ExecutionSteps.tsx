@@ -43,7 +43,7 @@ export function ExecutionSteps({ steps, activeStepId, onSelect, onStart }: Execu
           </div>
         </div>
       ) : (
-        <div className="h-full min-h-0 overflow-y-auto px-3 py-2">
+        <div className="runtime-scroll h-full min-h-0 overflow-y-auto px-3 py-2">
           <div className="space-y-1.5">
             {steps.map((step) => {
               const active = step.id === activeStepId;
